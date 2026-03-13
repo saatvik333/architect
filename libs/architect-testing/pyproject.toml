@@ -1,0 +1,20 @@
+[project]
+name = "architect-testing"
+version = "0.1.0"
+description = "Shared test utilities for ARCHITECT"
+requires-python = ">=3.12"
+dependencies = [
+    "architect-common",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/architect_testing"]
+
+[tool.uv.sources]
+architect-common = { workspace = true }

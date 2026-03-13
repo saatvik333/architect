@@ -1,0 +1,19 @@
+[project]
+name = "architect-events"
+version = "0.1.0"
+description = "Event schemas and pub/sub for ARCHITECT"
+requires-python = ">=3.12"
+dependencies = [
+    "architect-common",
+    "redis[hiredis]>=5.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/architect_events"]
+
+[tool.uv.sources]
+architect-common = { workspace = true }

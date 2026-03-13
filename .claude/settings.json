@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:learn.temporal.io)",
+      "WebFetch(domain:github.com)",
+      "Bash(export PATH=\"$HOME/.local/bin:$PATH\")",
+      "Bash(uv run:*)"
+    ]
+  }
+}

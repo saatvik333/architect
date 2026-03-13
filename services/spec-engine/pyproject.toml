@@ -1,0 +1,20 @@
+[project]
+name = "spec-engine"
+version = "0.1.0"
+description = "Specification Engine — natural language to formal spec translation for ARCHITECT"
+requires-python = ">=3.12"
+dependencies = [
+    "architect-common",
+    "architect-llm",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/spec_engine"]
+
+[tool.uv.sources]
+architect-common = { workspace = true }
+architect-llm = { workspace = true }

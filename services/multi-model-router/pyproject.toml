@@ -1,0 +1,20 @@
+[project]
+name = "multi-model-router"
+version = "0.1.0"
+description = "Multi-Model Router — intelligent LLM routing and load balancing for ARCHITECT"
+requires-python = ">=3.12"
+dependencies = [
+    "architect-common",
+    "architect-llm",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/multi_model_router"]
+
+[tool.uv.sources]
+architect-common = { workspace = true }
+architect-llm = { workspace = true }
