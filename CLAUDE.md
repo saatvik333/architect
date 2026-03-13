@@ -36,7 +36,14 @@ A multi-agent system that replaces the software engineering loop: specify → bu
 - `make infra-up` / `make infra-down` — docker compose
 - `make dev` — full local environment
 
+## Documentation Maintenance
+After completing any non-trivial change, automatically:
+1. Update relevant `docs/` files (runbooks, API reference, architecture docs, ADRs) to reflect the change
+2. Update `CLAUDE.md` if new conventions, commands, or components are added
+3. Keep these updates in the same commit as the code change, or as a follow-up commit immediately after
+
 ## Phase 1 Components (active)
+
 1. World State Ledger (Component 2)
 2. Task Graph Engine (Component 3)
 3. Execution Sandbox (Component 7)

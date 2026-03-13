@@ -21,6 +21,7 @@
 - [ ] Integration tests pass (`uv run pytest tests/integration/ -m integration`)
 - [ ] Linting passes (`uv run ruff check . && uv run ruff format --check .`)
 - [ ] Type checking passes (`uv run mypy libs/ services/ apps/`)
+- [ ] `CHANGELOG.md` updated under `[Unreleased]`
 
 ## Related Issues
 

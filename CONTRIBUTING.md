@@ -251,3 +251,35 @@ Tests use `pytest` with `--import-mode=importlib` and `asyncio_mode=auto`. Marke
 4. **Open a pull request** against `main`. A PR template is provided at `.github/pull_request_template.md` with checklists for testing, type checking, and linting.
 
 5. **Keep PRs focused** -- one logical change per PR. If a change spans multiple services, explain the cross-service impact in the PR description.
+
+## Changelog
+
+ARCHITECT uses [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format. Every PR that changes behaviour, adds a feature, or fixes a bug **must** update `CHANGELOG.md`.
+
+### Rules
+
+- Add your entry under the `## [Unreleased]` section at the top of the file.
+- Use one of these subsections:
+  - `### Added` — new features or components
+  - `### Changed` — changes to existing behaviour
+  - `### Deprecated` — features that will be removed
+  - `### Removed` — features removed in this release
+  - `### Fixed` — bug fixes
+  - `### Security` — security patches
+- Write entries in past tense, from the user's perspective (e.g. "Added X" not "Adds X").
+- The changelog check in CI will warn (not fail) if `CHANGELOG.md` is not touched — documentation-only PRs may skip this.
+
+### Releasing a version
+
+When cutting a release, move all `[Unreleased]` entries to a new versioned section:
+
+```markdown
+## [1.2.0] - 2026-04-01
+
+### Added
+- ...
+
+[1.2.0]: https://github.com/saatvik333/architect/compare/v1.1.0...v1.2.0
+```
+
+Then push a git tag (`git tag v1.2.0 && git push origin v1.2.0`). The `release` GitHub Actions workflow will automatically create a GitHub Release with the extracted changelog notes.
