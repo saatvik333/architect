@@ -109,7 +109,7 @@ The system is composed of **14 components** across **5 build phases**. Phase 1 (
 ```bash
 # Clone and install
 git clone <repo>
-cd osoleer-agi
+cd architect
 make install
 
 # Start infrastructure (Postgres, Redis, Temporal, NATS)
@@ -130,7 +130,7 @@ uv run python -m world_state_ledger.service
 ## Project Structure
 
 ```
-osoleer-agi/
+architect/
 ├── libs/                          # Shared libraries (no inter-service deps)
 │   ├── architect-common/          # Types, enums, errors, config, interfaces
 │   ├── architect-db/              # SQLAlchemy ORM models, repositories, migrations

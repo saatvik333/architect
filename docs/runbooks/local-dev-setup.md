@@ -57,7 +57,7 @@ uv --version
 
 ```bash
 git clone <repo-url>
-cd osoleer-agi
+cd architect
 uv sync --all-packages --group dev
 ```
 
