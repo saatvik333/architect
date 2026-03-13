@@ -8,7 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Nothing yet.
+- `infra/seccomp/sandbox-profile.json` — whitelist-only seccomp profile blocking `ptrace`, `mount`, `unshare`, `CLONE_NEWUSER`, `keyctl`, `syslog`, `pivot_root`, `bpf`, `perf_event_open`, and kernel module operations
+- 4 new DB repositories: `ProposalRepository`, `AgentSessionRepository`, `SandboxSessionRepository`, `EvaluationReportRepository`
+- `BudgetExceededError` under the `BudgetError` hierarchy in `architect-common`
+- `CostTracker.check_budget()` with configurable `max_budget_usd` and 75%/90% warning thresholds
+- `LLMClient.max_tool_calls` guard to prevent recursive tool-use cost explosions
+- CI: `security` job with Bandit SAST scan + CodeQL analysis on every push/PR
+- CI: UV dependency caching (`enable-cache: true`) on all jobs — ~3-5 min savings per run
+- CI: pytest-cov coverage reporting with Codecov upload
+- Release: Docker image build and push to GHCR (`ghcr.io/saatvik333/architect/service`) on version tags
+- Release: CHANGELOG entry validation before creating GitHub Release
+- `bandit[toml]` and `pytest-cov` added to dev dependency group
+
+### Changed
+- `SecurityValidator` command blocklist: all patterns now case-insensitive; added full-path variants (`/bin/rm`, `/usr/bin/curl`, etc.); 12 new dangerous patterns (`mknod`, `eval`, `exec`, `LD_PRELOAD`, `/dev/shm`, `find -exec`, `base64 -d`, `/proc/self`, etc.)
+- `SecurityValidator.validate_files()` now canonicalizes paths and rejects symlink escapes outside workspace root
+- `resource_limits.py`: containers now drop all capabilities (`cap_drop=["ALL"]`) and add back only 5 minimal ones; `pids_limit=256` (fork bomb protection); `blkio_weight=100`; seccomp profile wired in
+- `Dockerfile.sandbox`: workspace permissions `chmod 755` (not world-writable); added `HEALTHCHECK`; explicit `ENTRYPOINT ["python3"]`
+- `docker-compose.yml`: fixed NATS healthcheck (was invalid command); added `deploy.resources.limits` to all 5 services; postgres password now sourced from `${POSTGRES_PASSWORD:-architect_dev}`
+- `LLMClient`: calls `check_budget()` before every API call and before every retry to prevent over-spend
+- Integration CI job now depends on `security` job completing
 
 ## [0.1.0] - 2026-03-13
 

@@ -8,7 +8,12 @@ from typing import Any
 
 import anthropic
 
-from architect_common.errors import LLMError, LLMRateLimitError, LLMResponseError
+from architect_common.errors import (
+    BudgetExceededError,
+    LLMError,
+    LLMRateLimitError,
+    LLMResponseError,
+)
 
 from .cost_tracker import CostTracker
 from .models import LLMRequest, LLMResponse, TokenUsage
@@ -35,15 +40,18 @@ class LLMClient:
         default_model: str = "claude-sonnet-4-20250514",
         max_retries: int = 3,
         timeout: int = 120,
+        max_tool_calls: int = 10,
+        max_budget_usd: float | None = None,
     ) -> None:
         self._default_model = default_model
         self._max_retries = max_retries
+        self._max_tool_calls = max_tool_calls
         self._client = anthropic.AsyncAnthropic(
             api_key=api_key,
             max_retries=0,  # We handle retries ourselves for finer control.
             timeout=float(timeout),
         )
-        self._cost_tracker = CostTracker()
+        self._cost_tracker = CostTracker(max_budget_usd=max_budget_usd)
         self._rate_limiter = TokenBucketRateLimiter()
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
@@ -83,13 +91,37 @@ class LLMClient:
         estimated_tokens = request.max_tokens + sum(
             len(str(m.get("content", ""))) // 4 for m in request.messages
         )
+
+        # Rough cost estimate based on prompt length for budget pre-check.
+        from .cost_tracker import _resolve_pricing
+
+        input_price, output_price = _resolve_pricing(model_id)
+        estimated_input_tokens = sum(len(str(m.get("content", ""))) // 4 for m in request.messages)
+        estimated_cost = (estimated_input_tokens * input_price) + (
+            request.max_tokens * output_price
+        )
+        self._cost_tracker.check_budget(estimated_cost)
+
         await self._rate_limiter.acquire(estimated_tokens)
 
         last_exception: Exception | None = None
         for attempt in range(1, self._max_retries + 1):
             try:
                 response = await self._client.messages.create(**api_kwargs)
-                return self._parse_response(response, model_id)
+                result = self._parse_response(response, model_id)
+
+                # Enforce per-request tool call limit.
+                if result.tool_calls and len(result.tool_calls) > self._max_tool_calls:
+                    raise BudgetExceededError(
+                        f"Response contains {len(result.tool_calls)} tool calls, "
+                        f"exceeding limit of {self._max_tool_calls}",
+                        details={
+                            "tool_call_count": len(result.tool_calls),
+                            "max_tool_calls": self._max_tool_calls,
+                        },
+                    )
+
+                return result
 
             except anthropic.RateLimitError as exc:
                 last_exception = exc
@@ -104,8 +136,9 @@ class LLMClient:
                         f"Rate limit exceeded after {self._max_retries} retries",
                         details={"model_id": model_id},
                     ) from exc
-                # Back off before retrying.
+                # Back off before retrying; re-check budget to stop runaway retries.
                 await asyncio.sleep(2**attempt)
+                self._cost_tracker.check_budget()
 
             except anthropic.APIStatusError as exc:
                 last_exception = exc
@@ -119,6 +152,7 @@ class LLMClient:
                         exc,
                     )
                     await asyncio.sleep(2**attempt)
+                    self._cost_tracker.check_budget()
                     continue
                 raise LLMError(
                     f"API error {exc.status_code}: {exc.message}",
@@ -135,6 +169,7 @@ class LLMClient:
                         exc,
                     )
                     await asyncio.sleep(2**attempt)
+                    self._cost_tracker.check_budget()
                     continue
                 raise LLMError(
                     "Failed to connect to Anthropic API",

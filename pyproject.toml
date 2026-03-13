@@ -24,6 +24,7 @@ dev = [
     "ruff>=0.9",
     "mypy>=1.13",
     "pre-commit>=4.0",
+    "bandit[toml]>=1.7",
 ]
 
 [tool.ruff]
@@ -79,3 +80,7 @@ module = [
     "nats.*",
 ]
 ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "*/tests/*"]
+skips = ["B101"]  # allow assert statements in tests

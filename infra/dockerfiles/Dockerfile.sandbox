@@ -8,6 +8,7 @@ LABEL org.opencontainers.image.title="architect-sandbox" \
       architect.resource.disk_mb="10240"
 
 # Install common development tools needed by agents
+# Pin to --no-install-recommends to keep the image minimal
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         git \
@@ -23,8 +24,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 RUN groupadd --gid 1000 sandbox && \
     useradd --uid 1000 --gid sandbox --shell /bin/bash --create-home sandbox
 
-# Set up the workspace directory
-RUN mkdir -p /workspace && chown sandbox:sandbox /workspace
+# Set up the workspace directory with 755 permissions (owner-writable only)
+RUN mkdir -p /workspace && \
+    chown sandbox:sandbox /workspace && \
+    chmod 755 /workspace
 
 WORKDIR /workspace
 
@@ -33,5 +36,11 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     HOME=/home/sandbox
 
+# Simple health check to verify Python runtime is functional
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD python3 -c "import sys; sys.exit(0)"
+
 # Drop to non-root user
 USER sandbox
+
+ENTRYPOINT ["python3"]

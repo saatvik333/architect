@@ -11,6 +11,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
       - run: uv sync --all-packages --group dev --locked
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -20,6 +23,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
       - run: uv sync --all-packages --group dev --locked
       - run: uv run mypy libs/ services/ apps/
 
@@ -28,12 +34,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
       - run: uv sync --all-packages --group dev --locked
-      - run: uv run pytest libs/ services/ apps/ -x -q --tb=short
+      - run: uv run pytest libs/ services/ apps/ -x -q --tb=short --cov=libs --cov=services --cov=apps --cov-report=xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - run: uv sync --all-packages --group dev --locked
+      - name: Bandit SAST scan
+        run: uv run bandit -r libs/ services/ apps/ -ll --exclude tests -f json -o bandit-report.json || true
+      - name: Upload Bandit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        continue-on-error: true
 
   integration:
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, security]
     services:
       postgres:
         image: postgres:16
@@ -52,6 +94,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
       - run: uv sync --all-packages --group dev --locked
       - run: uv run pytest tests/integration/ -m integration -x -q --tb=short
         env:

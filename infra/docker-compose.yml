@@ -3,7 +3,7 @@ services:
     image: postgres:16
     environment:
       POSTGRES_USER: architect
-      POSTGRES_PASSWORD: architect_dev
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-architect_dev}
       POSTGRES_DB: architect
     ports:
       - "5432:5432"
@@ -15,6 +15,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
 
   redis:
     image: redis:7
@@ -28,6 +33,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
   temporal:
     image: temporalio/auto-setup:latest
@@ -43,6 +53,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
 
   temporal-ui:
     image: temporalio/ui:latest
@@ -52,6 +67,11 @@ services:
       - "8080:8080"
     depends_on:
       - temporal
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
 
   nats:
     image: nats:latest
@@ -60,10 +80,15 @@ services:
       - "4222:4222"
       - "8222:8222"
     healthcheck:
-      test: ["CMD", "nats-server", "--signal", "ldm"]
-      interval: 5s
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8222/healthz"]
+      interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
 
 volumes:
   postgres_data:

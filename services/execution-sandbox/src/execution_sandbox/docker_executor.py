@@ -28,7 +28,7 @@ from execution_sandbox.models import (
     SessionTimestamps,
 )
 from execution_sandbox.resource_limits import check_resource_usage, create_container_config
-from execution_sandbox.security import validate_command, validate_files
+from execution_sandbox.security import _resolve_sandbox_path, validate_command, validate_files
 
 logger = get_logger(component="docker_executor")
 
@@ -232,6 +232,16 @@ class DockerExecutor(ExecutorBase):
     async def read_files(self, session_id: str, paths: list[str]) -> dict[str, str]:
         """Read files from the sandbox via ``get_archive``."""
         session = self._get_session(session_id)
+
+        # Validate every requested path before touching the container
+        for path in paths:
+            safe, reason, _resolved = _resolve_sandbox_path(path)
+            if not safe:
+                raise SandboxSecurityError(
+                    f"File read rejected: {reason}",
+                    details={"path": path, "reason": reason},
+                )
+
         container = self._get_container(session)
 
         def _read() -> dict[str, str]:

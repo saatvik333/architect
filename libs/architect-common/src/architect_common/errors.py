@@ -110,5 +110,9 @@ class BudgetExhaustedError(BudgetError):
     """Total project budget has been exhausted."""
 
 
+class BudgetExceededError(BudgetError):
+    """An operation would exceed the configured budget limit."""
+
+
 class BudgetWarningError(BudgetError):
     """Budget warning threshold reached."""

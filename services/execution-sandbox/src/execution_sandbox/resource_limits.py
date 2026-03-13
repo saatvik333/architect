@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from execution_sandbox.models import SandboxSpec
+
+# Path to the seccomp profile mounted on the Docker host
+SECCOMP_PROFILE_PATH = Path("/etc/docker/seccomp/sandbox-profile.json")
 
 
 def create_container_config(spec: SandboxSpec) -> dict[str, Any]:
@@ -43,10 +47,17 @@ def create_container_config(spec: SandboxSpec) -> dict[str, Any]:
         "nano_cpus": nano_cpus,
         "mem_limit": mem_limit,
         "memswap_limit": mem_limit,  # disable swap
+        "pids_limit": 256,  # hard cap to prevent fork bombs
+        "blkio_weight": 100,  # low I/O priority so sandbox cannot starve host
         "network_mode": network_mode,
         "read_only": True,
         "tmpfs": tmpfs,
-        "security_opt": ["no-new-privileges"],
+        "cap_drop": ["ALL"],
+        "cap_add": ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"],
+        "security_opt": [
+            "no-new-privileges",
+            f"seccomp={SECCOMP_PROFILE_PATH}",
+        ],
         "user": "1000:1000",
         "working_dir": "/workspace",
         "environment": environment,

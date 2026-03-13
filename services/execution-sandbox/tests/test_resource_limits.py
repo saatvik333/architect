@@ -75,6 +75,35 @@ class TestCreateContainerConfig:
         config = create_container_config(sample_spec)
         assert config["command"] == ["sleep", "900"]
 
+    def test_pids_limit_present(self, sample_spec: SandboxSpec) -> None:
+        """Fork-bomb prevention: pids_limit must be set."""
+        config = create_container_config(sample_spec)
+        assert config["pids_limit"] == 256
+
+    def test_blkio_weight_present(self, sample_spec: SandboxSpec) -> None:
+        """Low I/O priority: blkio_weight must be set."""
+        config = create_container_config(sample_spec)
+        assert config["blkio_weight"] == 100
+
+    def test_cap_drop_all(self, sample_spec: SandboxSpec) -> None:
+        """All Linux capabilities must be dropped."""
+        config = create_container_config(sample_spec)
+        assert config["cap_drop"] == ["ALL"]
+
+    def test_cap_add_minimal(self, sample_spec: SandboxSpec) -> None:
+        """Only the minimal required capabilities are added back."""
+        config = create_container_config(sample_spec)
+        expected = ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"]
+        assert config["cap_add"] == expected
+
+    def test_seccomp_profile_in_security_opt(self, sample_spec: SandboxSpec) -> None:
+        """The seccomp profile path must be present in security_opt."""
+        config = create_container_config(sample_spec)
+        security_opts = config["security_opt"]
+        seccomp_entries = [s for s in security_opts if "seccomp=" in s]
+        assert len(seccomp_entries) == 1
+        assert "sandbox-profile.json" in seccomp_entries[0]
+
     def test_custom_resource_limits(self) -> None:
         spec = SandboxSpec(
             task_id=TaskId("task-custom"),
