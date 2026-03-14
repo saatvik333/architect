@@ -53,3 +53,6 @@ logs/
 # Node (for dashboard)
 node_modules/
 apps/dashboard/dist/
+
+# Git worktrees
+.worktrees/
