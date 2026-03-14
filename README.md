@@ -261,4 +261,9 @@ Test configuration: pytest with `--import-mode=importlib`, `asyncio_mode=auto`, 
 
 ## License
 
-TODO
+ARCHITECT is dual-licensed:
+
+- **Non-commercial use** — [PolyForm Noncommercial License 1.0.0](LICENSE). Free for personal projects, research, hobby work, study, and contributions. Commercial use is not permitted.
+- **Commercial use** — a separate commercial licence is required. See [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md) for details and how to obtain one.
+
+Copyright (c) 2026 [Saatvik](https://github.com/saatvik333). All rights reserved.
