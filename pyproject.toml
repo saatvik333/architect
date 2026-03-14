@@ -25,6 +25,7 @@ dev = [
     "mypy>=1.13",
     "pre-commit>=4.0",
     "bandit[toml]>=1.7",
+    "pip-audit>=2.7",
 ]
 
 [tool.ruff]

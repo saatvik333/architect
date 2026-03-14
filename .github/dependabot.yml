@@ -4,6 +4,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    labels:
+      - "infra"
+      - "github_actions"
     groups:
       actions:
         patterns:
@@ -13,9 +16,22 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    labels:
+      - "dependencies"
     groups:
       python-deps:
         patterns:
           - "*"
     allow:
       - dependency-type: "direct"
+
+  - package-ecosystem: "npm"
+    directory: "/apps/dashboard"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    groups:
+      dashboard-deps:
+        patterns:
+          - "*"

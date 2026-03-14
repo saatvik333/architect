@@ -1,0 +1,48 @@
+infra:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+          - "infra/**"
+          - "docker-compose*.yml"
+          - "Makefile"
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "*.md"
+          - "**/*.md"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "uv.lock"
+          - "**/pyproject.toml"
+
+phase-1:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "services/world-state-ledger/**"
+          - "services/task-graph-engine/**"
+          - "services/execution-sandbox/**"
+          - "services/evaluation-engine/**"
+          - "services/coding-agent/**"
+
+phase-2:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "services/spec-engine/**"
+          - "services/multi-model-router/**"
+          - "services/codebase-comprehension/**"
+          - "services/agent-comm-bus/**"
+          - "apps/dashboard/**"
+
+temporal:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/temporal/**"
+
+perf:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/benchmarks/**"

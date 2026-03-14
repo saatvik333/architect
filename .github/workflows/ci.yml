@@ -63,6 +63,13 @@ jobs:
         with:
           name: bandit-report
           path: bandit-report.json
+      - name: pip-audit CVE scan
+        run: uv run pip-audit --format json -o pip-audit-report.json || true
+      - name: Upload pip-audit results
+        uses: actions/upload-artifact@v7
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
 
   integration:
     runs-on: ubuntu-latest
