@@ -17,7 +17,7 @@ class ProposalRepository(BaseRepository[Proposal]):
 
     model_class = Proposal
 
-    async def get_by_id(self, proposal_id: ProposalId) -> Proposal | None:
+    async def get_by_id(self, proposal_id: str) -> Proposal | None:
         """Return the proposal with the given ID, or ``None``.
 
         Args:

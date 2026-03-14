@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Any, cast
 
 from temporalio import workflow
 
@@ -19,7 +20,7 @@ class EvaluationWorkflow:
     """
 
     @workflow.run
-    async def run(self, task_id: str, sandbox_session_id: str) -> dict:
+    async def run(self, task_id: str, sandbox_session_id: str) -> dict[str, Any]:
         """Execute the evaluation pipeline.
 
         Args:
@@ -37,4 +38,4 @@ class EvaluationWorkflow:
             args=[task_id, sandbox_session_id],
             start_to_close_timeout=timedelta(minutes=10),
         )
-        return result
+        return cast(dict[str, Any], result)

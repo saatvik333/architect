@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any, cast
 
 import redis.asyncio as aioredis
 
@@ -27,14 +28,16 @@ class StateCache:
 
     # ── Full state ───────────────────────────────────────────────────
 
-    async def get_current_state(self) -> dict | None:
+    async def get_current_state(self) -> dict[str, Any] | None:
         """Return the cached world state dict, or ``None`` if absent / expired."""
         raw: bytes | None = await self._redis.get(_STATE_KEY)
         if raw is None:
             return None
-        return json.loads(raw)
+        return cast(dict[str, Any], json.loads(raw))
 
-    async def set_current_state(self, state: dict, version: int, ttl_seconds: int = 30) -> None:
+    async def set_current_state(
+        self, state: dict[str, Any], version: int, ttl_seconds: int = 30
+    ) -> None:
         """Write *state* to the cache with *ttl_seconds* expiry."""
         payload = json.dumps(state, default=str)
         async with self._redis.pipeline(transaction=True) as pipe:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from temporalio import activity
 
 from architect_common.logging import get_logger
@@ -18,7 +20,7 @@ logger = get_logger(component="spec_engine.temporal.activities")
 async def parse_spec(
     raw_text: str,
     clarifications: dict[str, str] | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Parse raw text into a SpecResult.
 
     Args:
@@ -45,7 +47,7 @@ async def parse_spec(
 
 
 @activity.defn
-async def validate_spec(spec_dict: dict) -> list[str]:
+async def validate_spec(spec_dict: dict[str, Any]) -> list[str]:
     """Validate a spec and return a list of issues.
 
     Args:

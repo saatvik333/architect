@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from temporalio import activity
 
 from architect_common.logging import get_logger
@@ -15,7 +17,7 @@ logger = get_logger(component="evaluation_engine.temporal.activities")
 
 
 @activity.defn
-async def run_evaluation(task_id: str, sandbox_session_id: str) -> dict:
+async def run_evaluation(task_id: str, sandbox_session_id: str) -> dict[str, Any]:
     """Run the full evaluation pipeline for a task.
 
     This activity is designed to be executed by a Temporal worker.  It

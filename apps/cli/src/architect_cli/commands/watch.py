@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from typing import Any
 
 import httpx
 import typer
@@ -56,7 +57,7 @@ def watch(
         console.print("\n[dim]Watch stopped.[/dim]")
 
 
-def _build_table(task_id: str, data: dict, elapsed: float) -> Table:
+def _build_table(task_id: str, data: dict[str, Any], elapsed: float) -> Table:
     """Build a Rich table from task data."""
     table = Table(title=f"Watching: {task_id}", show_header=True)
     table.add_column("Field", style="bold cyan")

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 import httpx
 from fastapi import FastAPI, Request
@@ -128,20 +129,20 @@ async def get_task_logs(task_id: str, follow: bool = False) -> TaskLogsResponse:
 
 
 @app.post("/api/v1/tasks/{task_id}/cancel")
-async def cancel_task(task_id: str, body: CancelRequest | None = None) -> dict:
+async def cancel_task(task_id: str, body: CancelRequest | None = None) -> dict[str, Any]:
     """Cancel a running task."""
     force = body.force if body else False
     return await _client.cancel_task(task_id, force=force)
 
 
 @app.get("/api/v1/tasks/{task_id}/proposals")
-async def get_task_proposals(task_id: str) -> list[dict]:
+async def get_task_proposals(task_id: str) -> list[dict[str, Any]]:
     """Retrieve proposals for a task."""
     return await _client.get_proposals(task_id)
 
 
 @app.get("/api/v1/proposals/{proposal_id}")
-async def get_proposal(proposal_id: str) -> dict:
+async def get_proposal(proposal_id: str) -> dict[str, Any]:
     """Retrieve a single proposal by ID."""
     return await _client.get_proposal(proposal_id)
 
@@ -154,7 +155,7 @@ async def get_world_state() -> WorldStateResponse:
 
 
 @app.post("/api/v1/state/proposals")
-async def submit_proposal(body: ProposalSubmitRequest) -> dict:
+async def submit_proposal(body: ProposalSubmitRequest) -> dict[str, Any]:
     """Submit a raw proposal to the world state ledger."""
     return await _client.submit_proposal(body.model_dump())
 
@@ -163,19 +164,19 @@ async def submit_proposal(body: ProposalSubmitRequest) -> dict:
 
 
 @app.post("/api/v1/specs")
-async def create_spec(payload: dict) -> dict:
+async def create_spec(payload: dict[str, Any]) -> dict[str, Any]:
     """Submit a natural-language task description for spec parsing."""
     return await _client.create_spec(payload)
 
 
 @app.get("/api/v1/specs/{spec_id}")
-async def get_spec(spec_id: str) -> dict:
+async def get_spec(spec_id: str) -> dict[str, Any]:
     """Retrieve a parsed specification."""
     return await _client.get_spec(spec_id)
 
 
 @app.post("/api/v1/specs/{spec_id}/clarify")
-async def clarify_spec(spec_id: str, payload: dict) -> dict:
+async def clarify_spec(spec_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Answer clarification questions for an ambiguous spec."""
     return await _client.clarify_spec(spec_id, payload)
 
@@ -184,13 +185,13 @@ async def clarify_spec(spec_id: str, payload: dict) -> dict:
 
 
 @app.post("/api/v1/route")
-async def route_task(payload: dict) -> dict:
+async def route_task(payload: dict[str, Any]) -> dict[str, Any]:
     """Get a routing decision for a task."""
     return await _client.route_task(payload)
 
 
 @app.get("/api/v1/route/stats")
-async def get_routing_stats() -> dict:
+async def get_routing_stats() -> dict[str, Any]:
     """Retrieve routing statistics."""
     return await _client.get_routing_stats()
 
@@ -199,19 +200,19 @@ async def get_routing_stats() -> dict:
 
 
 @app.post("/api/v1/index")
-async def index_codebase(payload: dict) -> dict:
+async def index_codebase(payload: dict[str, Any]) -> dict[str, Any]:
     """Index a codebase directory."""
     return await _client.index_codebase(payload)
 
 
 @app.get("/api/v1/context")
-async def get_code_context(task_description: str = "") -> dict:
+async def get_code_context(task_description: str = "") -> dict[str, Any]:
     """Get relevant code context for a task description."""
     return await _client.get_code_context({"task_description": task_description})
 
 
 @app.get("/api/v1/symbols")
-async def search_symbols(query: str = "", limit: int = 20) -> dict:
+async def search_symbols(query: str = "", limit: int = 20) -> dict[str, Any]:
     """Search for code symbols."""
     return await _client.search_symbols({"query": query, "limit": limit})
 
@@ -220,12 +221,12 @@ async def search_symbols(query: str = "", limit: int = 20) -> dict:
 
 
 @app.get("/api/v1/bus/stats")
-async def get_bus_stats() -> dict:
+async def get_bus_stats() -> dict[str, Any]:
     """Get message bus statistics."""
     return await _client.get_bus_stats()
 
 
 @app.post("/api/v1/bus/publish")
-async def publish_message(payload: dict) -> dict:
+async def publish_message(payload: dict[str, Any]) -> dict[str, Any]:
     """Publish a message to the agent communication bus."""
     return await _client.publish_message(payload)

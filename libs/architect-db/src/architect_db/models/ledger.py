@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -25,7 +26,7 @@ class WorldStateLedger(Base):
         primary_key=True,
         autoincrement=True,
     )
-    state_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    state_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

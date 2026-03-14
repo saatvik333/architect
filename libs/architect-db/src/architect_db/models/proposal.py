@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import BigInteger, DateTime, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -22,7 +23,7 @@ class Proposal(UUIDPrimaryKeyMixin, Base):
     agent_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     task_id: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    mutations: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    mutations: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     verdict: Mapped[str] = mapped_column(Text, nullable=False, default="pending")

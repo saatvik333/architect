@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import networkx as nx
 
 from architect_common.errors import CircularDependencyError, TaskNotFoundError
@@ -66,7 +68,7 @@ class TaskDAG:
                 f"Task {task_id} not found",
                 details={"task_id": task_id},
             )
-        return self._graph.nodes[task_id]["task"]
+        return cast(Task, self._graph.nodes[task_id]["task"])
 
     @property
     def task_ids(self) -> list[TaskId]:
@@ -76,7 +78,7 @@ class TaskDAG:
     @property
     def task_count(self) -> int:
         """Return the number of tasks in the graph."""
-        return self._graph.number_of_nodes()
+        return int(self._graph.number_of_nodes())
 
     def get_execution_order(self) -> list[TaskId]:
         """Return a topological ordering of all tasks.

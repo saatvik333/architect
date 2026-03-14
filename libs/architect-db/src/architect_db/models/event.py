@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import BigInteger, DateTime, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -32,7 +33,7 @@ class EventLog(UUIDPrimaryKeyMixin, Base):
     task_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     agent_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
 
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     source: Mapped[str | None] = mapped_column(Text, nullable=True)
     idempotency_key: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
 

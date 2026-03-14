@@ -27,7 +27,9 @@ class TestMessageBusConnect:
         mock_nc.jetstream.return_value = mock_js
 
         bus = MessageBus(nats_url="nats://test:4222")
-        with patch("agent_comm_bus.bus.nats.connect", new_callable=AsyncMock, return_value=mock_nc) as mock_connect:
+        with patch(
+            "agent_comm_bus.bus.nats.connect", new_callable=AsyncMock, return_value=mock_nc
+        ) as mock_connect:
             await bus.connect()
 
         mock_connect.assert_called_once_with("nats://test:4222")

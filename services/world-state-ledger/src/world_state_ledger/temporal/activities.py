@@ -8,7 +8,7 @@ can access them without Temporal needing to know about our DI setup.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from temporalio import activity
 
@@ -33,17 +33,17 @@ def register_dependencies(state_manager: Any, event_log: Any) -> None:
 
 
 @activity.defn
-async def get_current_state() -> dict:
+async def get_current_state() -> dict[str, Any]:
     """Return the current world state as a plain dict."""
     if _state_manager is None:
         msg = "StateManager not registered — call register_dependencies first"
         raise RuntimeError(msg)
     state = await _state_manager.get_current()
-    return state.model_dump(mode="json")
+    return cast(dict[str, Any], state.model_dump(mode="json"))
 
 
 @activity.defn
-async def submit_proposal(proposal_data: dict) -> str:
+async def submit_proposal(proposal_data: dict[str, Any]) -> str:
     """Persist a new proposal and return its ID."""
     if _state_manager is None:
         msg = "StateManager not registered — call register_dependencies first"
@@ -52,7 +52,7 @@ async def submit_proposal(proposal_data: dict) -> str:
     from world_state_ledger.models import Proposal
 
     proposal = Proposal.model_validate(proposal_data)
-    return await _state_manager.submit_proposal(proposal)
+    return cast(str, await _state_manager.submit_proposal(proposal))
 
 
 @activity.defn
@@ -61,4 +61,4 @@ async def validate_and_commit(proposal_id: str) -> bool:
     if _state_manager is None:
         msg = "StateManager not registered — call register_dependencies first"
         raise RuntimeError(msg)
-    return await _state_manager.validate_and_commit(proposal_id)
+    return cast(bool, await _state_manager.validate_and_commit(proposal_id))

@@ -41,7 +41,7 @@ class DeadLetterProcessor:
     async def count(self, event_type: EventType) -> int:
         """Return the number of messages in the DLQ for *event_type*."""
         assert self._redis is not None
-        return await self._redis.xlen(self._dlq_stream(event_type))
+        return int(await self._redis.xlen(self._dlq_stream(event_type)))
 
     async def reprocess(self, event_type: EventType, count: int = 100) -> int:
         """Re-publish up to *count* DLQ messages back to the origin stream.

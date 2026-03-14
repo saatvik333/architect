@@ -46,7 +46,7 @@ class ServiceClient:
         if attr is None:
             msg = f"Unknown service: {service}"
             raise ValueError(msg)
-        return getattr(self._config, attr)
+        return str(getattr(self._config, attr))
 
     async def _request(
         self,
@@ -54,7 +54,7 @@ class ServiceClient:
         method: str,
         path: str,
         **kwargs: Any,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Send an HTTP request to a backend service.
 
         Raises ``httpx.HTTPStatusError`` on non-2xx responses.
@@ -70,69 +70,69 @@ class ServiceClient:
 
     # ── Typed methods ────────────────────────────────────────────────
 
-    async def submit_task(self, data: dict) -> dict:
+    async def submit_task(self, data: dict[str, Any]) -> dict[str, Any]:
         return await self._request("task-graph", "POST", "/api/v1/tasks", json=data)
 
-    async def get_task_status(self, task_id: str) -> dict:
+    async def get_task_status(self, task_id: str) -> dict[str, Any]:
         return await self._request("task-graph", "GET", f"/api/v1/tasks/{task_id}")
 
-    async def get_task_logs(self, task_id: str, follow: bool = False) -> dict:
+    async def get_task_logs(self, task_id: str, follow: bool = False) -> dict[str, Any]:
         return await self._request(
             "task-graph", "GET", f"/api/v1/tasks/{task_id}/logs", params={"follow": follow}
         )
 
-    async def cancel_task(self, task_id: str, force: bool = False) -> dict:
+    async def cancel_task(self, task_id: str, force: bool = False) -> dict[str, Any]:
         return await self._request(
             "task-graph", "POST", f"/api/v1/tasks/{task_id}/cancel", json={"force": force}
         )
 
-    async def get_proposals(self, task_id: str) -> list[dict]:
+    async def get_proposals(self, task_id: str) -> list[dict[str, Any]]:
         return await self._request(  # type: ignore[return-value]
             "world-state", "GET", f"/api/v1/tasks/{task_id}/proposals"
         )
 
-    async def get_proposal(self, proposal_id: str) -> dict:
+    async def get_proposal(self, proposal_id: str) -> dict[str, Any]:
         return await self._request("world-state", "GET", f"/api/v1/proposals/{proposal_id}")
 
-    async def submit_proposal(self, data: dict) -> dict:
+    async def submit_proposal(self, data: dict[str, Any]) -> dict[str, Any]:
         return await self._request("world-state", "POST", "/api/v1/state/proposals", json=data)
 
-    async def get_world_state(self) -> dict:
+    async def get_world_state(self) -> dict[str, Any]:
         return await self._request("world-state", "GET", "/api/v1/state")
 
-    async def get_service_health(self, service: str) -> dict:
+    async def get_service_health(self, service: str) -> dict[str, Any]:
         return await self._request(service, "GET", "/health")
 
     # ── Phase 2 service methods ───────────────────────────────────
 
-    async def create_spec(self, data: dict) -> dict:
+    async def create_spec(self, data: dict[str, Any]) -> dict[str, Any]:
         return await self._request("spec-engine", "POST", "/api/v1/specs", json=data)
 
-    async def get_spec(self, spec_id: str) -> dict:
+    async def get_spec(self, spec_id: str) -> dict[str, Any]:
         return await self._request("spec-engine", "GET", f"/api/v1/specs/{spec_id}")
 
-    async def clarify_spec(self, spec_id: str, data: dict) -> dict:
+    async def clarify_spec(self, spec_id: str, data: dict[str, Any]) -> dict[str, Any]:
         return await self._request(
             "spec-engine", "POST", f"/api/v1/specs/{spec_id}/clarify", json=data
         )
 
-    async def route_task(self, data: dict) -> dict:
+    async def route_task(self, data: dict[str, Any]) -> dict[str, Any]:
         return await self._request("router", "POST", "/api/v1/route", json=data)
 
-    async def get_routing_stats(self) -> dict:
+    async def get_routing_stats(self) -> dict[str, Any]:
         return await self._request("router", "GET", "/api/v1/route/stats")
 
-    async def index_codebase(self, data: dict) -> dict:
+    async def index_codebase(self, data: dict[str, Any]) -> dict[str, Any]:
         return await self._request("codebase", "POST", "/api/v1/index", json=data)
 
-    async def get_code_context(self, params: dict) -> dict:
+    async def get_code_context(self, params: dict[str, Any]) -> dict[str, Any]:
         return await self._request("codebase", "GET", "/api/v1/context", params=params)
 
-    async def search_symbols(self, params: dict) -> dict:
+    async def search_symbols(self, params: dict[str, Any]) -> dict[str, Any]:
         return await self._request("codebase", "GET", "/api/v1/symbols", params=params)
 
-    async def get_bus_stats(self) -> dict:
+    async def get_bus_stats(self) -> dict[str, Any]:
         return await self._request("comm-bus", "GET", "/api/v1/bus/stats")
 
-    async def publish_message(self, data: dict) -> dict:
+    async def publish_message(self, data: dict[str, Any]) -> dict[str, Any]:
         return await self._request("comm-bus", "POST", "/api/v1/bus/publish", json=data)

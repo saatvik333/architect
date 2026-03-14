@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -26,8 +27,8 @@ class SandboxSession(UUIDPrimaryKeyMixin, Base):
     container_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     image: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    resource_limits: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    resource_limits: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    config: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

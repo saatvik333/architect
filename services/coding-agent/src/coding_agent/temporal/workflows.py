@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Any
 
 from temporalio import workflow
 
@@ -22,7 +23,7 @@ class CodingAgentWorkflow:
     """
 
     @workflow.run
-    async def run(self, run_data: dict) -> dict:
+    async def run(self, run_data: dict[str, Any]) -> dict[str, Any]:
         """Execute the full coding agent pipeline.
 
         Args:
@@ -54,7 +55,7 @@ class CodingAgentWorkflow:
         )
 
         # Step 3: Test in sandbox, retry if needed
-        test_result: dict = {}
+        test_result: dict[str, Any] = {}
         for attempt in range(max_retries + 1):
             test_commands = [
                 "cd /workspace && python -m py_compile $(find . -name '*.py') 2>&1",

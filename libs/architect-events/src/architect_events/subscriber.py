@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import logging
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 import redis.asyncio as aioredis
 
@@ -117,7 +118,7 @@ class EventSubscriber:
         stream_name: str,
         event_type: EventType,
         message_id: bytes | str,
-        data: dict,
+        data: dict[Any, Any],
         error: str,
     ) -> None:
         """Move a failed message to the dead-letter queue."""
@@ -137,7 +138,7 @@ class EventSubscriber:
 
         await self._redis.xadd(dlq_stream, dlq_fields)  # type: ignore[arg-type]
         # ACK the original so it doesn't stay in PEL
-        await self._redis.xack(stream_name, self._group, message_id)  # type: ignore[arg-type]
+        await self._redis.xack(stream_name, self._group, message_id)
         logger.warning(
             "Moved message %s to DLQ %s after %d retries",
             mid_str,
@@ -186,7 +187,7 @@ class EventSubscriber:
         self,
         event_type: EventType,
         count: int = 100,
-    ) -> list[tuple[str, dict]]:
+    ) -> list[tuple[str, dict[str, Any]]]:
         """Read messages from the DLQ for inspection.
 
         Returns a list of ``(message_id, data)`` tuples.
@@ -197,7 +198,7 @@ class EventSubscriber:
 
         dlq_stream = self._dlq_stream_name(event_type)
         results = await self._redis.xrange(dlq_stream, count=count)
-        out: list[tuple[str, dict]] = []
+        out: list[tuple[str, dict[str, Any]]] = []
         for mid, data in results:
             mid_str = mid.decode() if isinstance(mid, bytes) else mid
             decoded = {
@@ -299,5 +300,5 @@ class EventSubscriber:
                         # else: don't ACK — message stays in PEL for retry
                     else:
                         # All handlers succeeded — acknowledge.
-                        await self._redis.xack(stream_name, self._group, message_id)  # type: ignore[arg-type]
+                        await self._redis.xack(stream_name, self._group, message_id)
                         self._retry_counts.pop(mid_str, None)

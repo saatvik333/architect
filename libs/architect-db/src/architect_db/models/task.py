@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import DateTime, Integer, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
@@ -28,13 +29,13 @@ class Task(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     dependencies: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     dependents: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
 
-    inputs: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    outputs: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    budget: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    inputs: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    outputs: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    budget: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     assigned_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
     current_attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    retry_history: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True)
+    retry_history: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
 
     verdict: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)

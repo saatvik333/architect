@@ -15,7 +15,7 @@ class AgentSessionRepository(BaseRepository[AgentSession]):
 
     model_class = AgentSession
 
-    async def get_by_id(self, agent_id: AgentId) -> AgentSession | None:
+    async def get_by_id(self, agent_id: str) -> AgentSession | None:
         """Return the agent session with the given ID, or ``None``.
 
         Args:

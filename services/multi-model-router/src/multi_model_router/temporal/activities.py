@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from temporalio import activity
 
 from architect_common.enums import TaskType
@@ -15,7 +17,7 @@ logger = get_logger(component="multi_model_router.temporal.activities")
 
 
 @activity.defn
-async def route_task(task_data: dict) -> dict:
+async def route_task(task_data: dict[str, Any]) -> dict[str, Any]:
     """Score and route a task to the appropriate model tier.
 
     Args:

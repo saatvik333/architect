@@ -27,7 +27,9 @@ a Python test file (pytest) that exercises adversarial edge cases:
 Output ONLY valid Python code for a test file, no markdown fences.
 """
 
-_RUN_ADVERSARIAL_TESTS = "cd /workspace && python -m pytest /tmp/test_adversarial_generated.py --tb=short -q 2>&1"
+_RUN_ADVERSARIAL_TESTS = (
+    "cd /workspace && python -m pytest /tmp/test_adversarial_generated.py --tb=short -q 2>&1"
+)
 
 
 class AdversarialLayer(EvalLayerBase):
@@ -58,7 +60,9 @@ class AdversarialLayer(EvalLayerBase):
         read_request = ExecutionRequest(
             task_id=session_info.get("task_id", "task-000000000000"),
             agent_id=session_info.get("agent_id", "agent-000000000000"),
-            commands=["find /workspace -name '*.py' -not -path '*/__pycache__/*' | head -20 | xargs cat 2>&1"],
+            commands=[
+                "find /workspace -name '*.py' -not -path '*/__pycache__/*' | head -20 | xargs cat 2>&1"
+            ],
             timeout_seconds=60,
         )
         source_result = await self._sandbox.execute(read_request)

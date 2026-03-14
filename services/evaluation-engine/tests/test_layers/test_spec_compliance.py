@@ -84,10 +84,7 @@ class TestSpecComplianceLayer:
                 CommandResult(
                     command="pytest --collect-only -q",
                     exit_code=0,
-                    stdout=(
-                        "tests/test_auth.py::test_user_can_login\n"
-                        "\n1 test collected"
-                    ),
+                    stdout=("tests/test_auth.py::test_user_can_login\n\n1 test collected"),
                     stderr="",
                     duration_ms=200,
                 ),

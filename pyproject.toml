@@ -77,12 +77,14 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 plugins = ["pydantic.mypy"]
+exclude = ["^.*/tests/"]
 
-[tool.mypy.overrides]
+[[tool.mypy.overrides]]
 module = [
     "temporalio.*",
     "docker.*",
     "nats.*",
+    "networkx.*",
 ]
 ignore_missing_imports = true
 

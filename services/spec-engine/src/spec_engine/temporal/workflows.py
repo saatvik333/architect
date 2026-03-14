@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Any
 
 from temporalio import workflow
 
@@ -18,7 +19,7 @@ class SpecificationWorkflow:
     """
 
     @workflow.run
-    async def run(self, input_data: dict) -> dict:
+    async def run(self, input_data: dict[str, Any]) -> dict[str, Any]:
         """Execute the specification pipeline.
 
         Args:

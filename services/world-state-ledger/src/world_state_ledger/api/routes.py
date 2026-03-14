@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from architect_common.enums import HealthStatus
 from architect_common.errors import LedgerVersionNotFoundError
+from architect_common.types import AgentId, TaskId
 from world_state_ledger.api.dependencies import EventLogDep, StateManagerDep
 from world_state_ledger.models import Proposal
 
@@ -82,8 +83,8 @@ async def query_events(
     """Return event log entries matching the given filters."""
     return await event_log.query(
         event_type=event_type,
-        task_id=task_id,
-        agent_id=agent_id,
+        task_id=TaskId(task_id) if task_id else None,
+        agent_id=AgentId(agent_id) if agent_id else None,
         limit=limit,
         offset=offset,
     )

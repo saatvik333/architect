@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +30,7 @@ def get_config() -> TaskGraphEngineConfig:
 _session_factory = None
 
 
-def _get_session_factory(config: TaskGraphEngineConfig = Depends(get_config)):
+def _get_session_factory(config: TaskGraphEngineConfig = Depends(get_config)) -> Any:
     """Lazily create and cache the async session factory."""
     global _session_factory
     if _session_factory is None:
@@ -44,7 +44,7 @@ def _get_session_factory(config: TaskGraphEngineConfig = Depends(get_config)):
 
 
 async def get_db_session(
-    factory=Depends(_get_session_factory),
+    factory: Any = Depends(_get_session_factory),
 ) -> AsyncGenerator[AsyncSession, None]:
     """Yield a transactional database session."""
     async for session in get_session(factory):

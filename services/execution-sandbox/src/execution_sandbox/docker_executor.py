@@ -57,7 +57,7 @@ class DockerExecutor(ExecutorBase):
 
         def _create() -> str:
             container = self._client.containers.run(**config)
-            return container.id  # type: ignore[union-attr]
+            return str(container.id)
 
         try:
             container_id = await asyncio.get_event_loop().run_in_executor(None, _create)

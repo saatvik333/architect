@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from temporalio import activity
 
 from architect_common.logging import get_logger
@@ -21,7 +23,7 @@ logger = get_logger(component="coding_agent.temporal.activities")
 
 
 @activity.defn
-async def plan_task(run_data: dict) -> str:
+async def plan_task(run_data: dict[str, Any]) -> str:
     """Generate an implementation plan for a task.
 
     Args:
@@ -51,7 +53,7 @@ async def plan_task(run_data: dict) -> str:
 
 
 @activity.defn
-async def generate_code(plan: str, run_data: dict) -> list[dict]:
+async def generate_code(plan: str, run_data: dict[str, Any]) -> list[dict[str, Any]]:
     """Generate code files from a plan and task specification.
 
     Args:
@@ -89,7 +91,7 @@ async def generate_code(plan: str, run_data: dict) -> list[dict]:
 
 
 @activity.defn
-async def execute_in_sandbox(files: list[dict], commands: list[str]) -> dict:
+async def execute_in_sandbox(files: list[dict[str, Any]], commands: list[str]) -> dict[str, Any]:
     """Write files to a sandbox and execute commands.
 
     Args:

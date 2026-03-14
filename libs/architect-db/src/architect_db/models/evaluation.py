@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -27,13 +28,13 @@ class EvaluationReport(UUIDPrimaryKeyMixin, Base):
 
     verdict: Mapped[str] = mapped_column(Text, nullable=False)
     layers_run: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    layer_results: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    layer_results: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    score: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
+    score: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    metadata_: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -8,6 +8,8 @@ from typing import Any
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
+    from temporalio.common import RetryPolicy
+
     from architect_common.enums import EvalVerdict, StatusEnum
 
 
@@ -99,7 +101,7 @@ class TaskOrchestrationWorkflow:
                     "execute_task",
                     args=[next_task],
                     start_to_close_timeout=timedelta(minutes=30),
-                    retry_policy=workflow.RetryPolicy(
+                    retry_policy=RetryPolicy(
                         maximum_attempts=next_task.get("max_retries", 3),
                         initial_interval=timedelta(seconds=10),
                         backoff_coefficient=2.0,

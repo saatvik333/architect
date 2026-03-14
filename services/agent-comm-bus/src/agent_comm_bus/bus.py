@@ -148,7 +148,7 @@ class MessageBus:
             return
 
         try:
-            await self._js.find_stream_info_by_subject(f"{self._stream_name}.*")
+            await self._js.find_stream_info_by_subject(f"{self._stream_name}.*")  # type: ignore[attr-defined]
         except Exception:
             await self._js.add_stream(
                 name=self._stream_name,
