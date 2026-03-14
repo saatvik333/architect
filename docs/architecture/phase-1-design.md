@@ -103,11 +103,19 @@ When multiple tasks are ready (all dependencies satisfied), the scheduler select
 
 Tasks transition through states with validation rules:
 
-```
-pending -> running -> completed
-                   -> failed -> pending (retry)
-       -> blocked (dependency failed)
-       -> cancelled
+```mermaid
+stateDiagram-v2
+    [*] --> pending
+    pending --> running
+    running --> completed
+    running --> failed
+    failed --> pending : retry
+    pending --> blocked : dependency failed
+    pending --> cancelled
+    running --> cancelled
+    completed --> [*]
+    blocked --> [*]
+    cancelled --> [*]
 ```
 
 Valid transitions are enforced -- for example, a `completed` task cannot move to `running`. The `StatusEnum` covers all six states: `pending`, `running`, `completed`, `failed`, `blocked`, `cancelled`.
@@ -508,13 +516,14 @@ Agent lifecycle records.
 
 ### Entity Relationships
 
-```
-proposals ──────────> world_state_ledger  (proposal_id FK)
-tasks <──────────── sandbox_sessions      (task_id FK)
-tasks <──────────── evaluation_reports    (task_id FK)
-tasks <──────────── agent_sessions        (current_task FK)
-sandbox_sessions <── sandbox_audit_log    (session_id FK)
-sandbox_sessions <── evaluation_reports   (sandbox_session_id FK)
+```mermaid
+erDiagram
+    proposals ||--o{ world_state_ledger : "proposal_id FK"
+    tasks ||--o{ sandbox_sessions : "task_id FK"
+    tasks ||--o{ evaluation_reports : "task_id FK"
+    tasks ||--o{ agent_sessions : "current_task FK"
+    sandbox_sessions ||--o{ sandbox_audit_log : "session_id FK"
+    sandbox_sessions ||--o{ evaluation_reports : "sandbox_session_id FK"
 ```
 
 ---

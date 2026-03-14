@@ -78,6 +78,24 @@ The `TaskOrchestrationWorkflow` implements the main loop:
    - `FAIL_SOFT`: marks `FAILED` (Temporal's retry policy handles retries at the activity level).
 8. Returns a summary dict with total/completed/failed counts and per-task results.
 
+```mermaid
+flowchart TD
+    Start(["TaskOrchestrationWorkflow"]) --> Decompose["decompose_spec (5 min timeout)"]
+    Decompose --> Loop{{"Loop: max_iterations = len(tasks) × 4"}}
+    Loop --> Budget["check_budget (30s timeout)"]
+    Budget -->|exhausted| Done(["Return summary"])
+    Budget -->|ok| Schedule["schedule_next_task (30s timeout)"]
+    Schedule -->|no ready task| Done
+    Schedule --> SetRunning["update_task_status → RUNNING (30s timeout)"]
+    SetRunning --> Execute["execute_task (30 min, 3 attempts, 10s→2×→5m max)"]
+    Execute -->|PASS| Complete["mark COMPLETED, add to completed set"]
+    Execute -->|FAIL_HARD| Fail["mark FAILED, add to failed set"]
+    Execute -->|FAIL_SOFT| Retry["Temporal retries at activity level"]
+    Retry --> Execute
+    Complete --> Loop
+    Fail --> Loop
+```
+
 ### Infrastructure
 
 Temporal server runs as a Docker container (`temporalio/auto-setup`) backed by the shared Postgres database. The Temporal UI (`temporalio/ui`) is exposed on port 8080 for operational visibility.

@@ -22,6 +22,15 @@ The system publishes a variety of event types across the lifecycle: `task.create
 
 We adopt a **dual-storage event sourcing architecture**:
 
+```mermaid
+flowchart LR
+    Producer["Service (producer)"] -->|"EventEnvelope (typed payload)"| PG[("PostgreSQL event_log (append-only)")]
+    Producer -->|"XADD to architect:{type}"| Redis[("Redis Streams")]
+    PG -->|historical replay| NewService["New Service (replay from log)"]
+    Redis -->|"consumer group (at-least-once)"| ConsumerA["Consumer A"]
+    Redis -->|"consumer group (at-least-once)"| ConsumerB["Consumer B"]
+```
+
 1. **PostgreSQL append-only event log** serves as the durable, authoritative event store. Every event is written to the `event_log` table with an `idempotency_key` (using `ON CONFLICT DO NOTHING`) to prevent duplicate writes. Events carry a type, timestamp, correlation ID, and JSON payload. This log supports historical replay and point-in-time reconstruction.
 
 2. **Redis Streams** serve as the real-time pub/sub transport. After an event is persisted to PostgreSQL, it is published to a Redis Stream named `architect:{event_type}` (e.g., `architect:task.completed`). Consumers use Redis consumer groups for load-balanced, at-least-once delivery.

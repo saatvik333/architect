@@ -60,6 +60,21 @@ The `max_clarification_rounds` config (default 3) prevents infinite clarificatio
 - No duplicate criterion IDs
 - No empty criterion descriptions
 
+#### Clarification Flow
+
+```mermaid
+flowchart TD
+    Input["Raw text input"] --> Parse["parse_spec (5 min timeout, 3 retries)"]
+    Parse --> Ambiguous{needs_clarification?}
+    Ambiguous -->|yes| Questions["Return ClarificationQuestions — POST /specs/{id}/clarify"]
+    Questions --> Answers["Client provides answers"]
+    Answers --> Parse
+    Ambiguous -->|no| Validate["validate_spec (1 min timeout)"]
+    Validate --> Valid{valid?}
+    Valid -->|yes| Return["Return TaskSpec"]
+    Valid -->|no| Error["Return validation error"]
+```
+
 #### Temporal Workflow
 
 `SpecificationWorkflow` orchestrates the full pipeline:
@@ -125,8 +140,11 @@ The final score is `sum(factor * weight)` clamped to [0.0, 1.0].
 
 `EscalationPolicy` tracks failure history per task:
 
-```
-TIER_3 --[2 failures]--> TIER_2 --[2 failures]--> TIER_1 --[2 failures]--> HUMAN
+```mermaid
+flowchart LR
+    T3["Tier 3 (Haiku)"] -->|"2 failures"| T2["Tier 2 (Sonnet)"]
+    T2 -->|"2 failures"| T1["Tier 1 (Opus)"]
+    T1 -->|"2 failures"| HUMAN["Human Escalation"]
 ```
 
 - `record_failure(task_id, current_tier)` increments the failure counter and returns an `EscalationRecord`
@@ -376,6 +394,27 @@ Phase 2 introduces a second communication channel alongside the existing Redis S
 | Event Bus | Redis Streams | Pub/sub with consumer groups | System events (task lifecycle, proposals, evaluations) |
 | Message Bus | NATS JetStream | Pub/sub, request/reply, queue groups | Direct agent-to-agent communication, context sharing |
 
+```mermaid
+flowchart LR
+    subgraph Services["Services"]
+        TGE["Task Graph Engine"]
+        CA["Coding Agent"]
+        EE["Evaluation Engine"]
+        WSL["World State Ledger"]
+    end
+
+    subgraph EventBus["Event Bus — Redis Streams"]
+        RS[("architect:{event_type}")]
+    end
+
+    subgraph MessageBus["Message Bus — NATS JetStream"]
+        NATS[("ARCHITECT stream")]
+    end
+
+    Services -->|"system events (broadcast)"| EventBus
+    Services -->|"targeted messages (agent-to-agent)"| MessageBus
+```
+
 The Event Bus (from Phase 1) carries system-wide events that any component can observe. The Message Bus (Phase 2) carries targeted messages between specific agents for coordination.
 
 ---
@@ -400,16 +439,17 @@ Phase 2 adds 7 new event types to `EventType`:
 
 Phase 2 adds 8 new exceptions to the `ArchitectError` hierarchy:
 
-```
-ArchitectError
-├── SpecError
-│   ├── SpecAmbiguousError       — spec needs clarification
-│   └── SpecValidationError      — spec failed validation
-├── CommBusError
-│   ├── MessageDeliveryError     — publish failed after retries
-│   └── MessageTimeoutError      — request/reply timed out
-└── RoutingError
-    └── NoAvailableTierError     — all tiers exhausted, need human
+```mermaid
+flowchart TD
+    AE["ArchitectError"]
+    AE --> SE["SpecError"]
+    SE --> SAE["SpecAmbiguousError — spec needs clarification"]
+    SE --> SVE["SpecValidationError — spec failed validation"]
+    AE --> CBE["CommBusError"]
+    CBE --> MDE["MessageDeliveryError — publish failed after retries"]
+    CBE --> MTE["MessageTimeoutError — request/reply timed out"]
+    AE --> RE["RoutingError"]
+    RE --> NATE["NoAvailableTierError — all tiers exhausted, need human"]
 ```
 
 ---

@@ -30,78 +30,34 @@ ARCHITECT is designed for increasing autonomy, not full autonomy from day one. E
 
 ## System Architecture
 
-```
-                              USER
-                               |
-                     +---------+---------+
-                     |  CLI / API GW     |
-                     |  (apps/)          |
-                     +---------+---------+
-                               |
-               +---------------+----------------+
-               |                                |
-               v                                v
-     +---------+----------+           +---------+---------+
-     |  Spec Engine [P2]  |           |  Human Interface  |
-     |  parse/validate    |           |  [P5] dashboard   |
-     +--------+-----------+           +-------------------+
-              |
-              v
-     +--------+-----------+
-     |  Task Graph Engine  |<-----------------------------------+
-     |  (DAG + scheduler)  |                                    |
-     +--+-----+--------+--+                                    |
-        |     |        |                                       |
-        |     |        +------------------+                    |
-        v     v                           v                    |
-  +-----+--+ +--------+        +---------+---------+          |
-  | Multi- | | Agent   |        |  Coding Agent     |          |
-  | Model  | | Comm    |        |  plan -> gen ->   |          |
-  | Router | | Bus     |        |  test -> fix      |          |
-  | [P2]   | | [P2]    |        +--------+----------+          |
-  +--------+ +--------+                  |                     |
-                                         v                     |
-                               +---------+---------+           |
-                               |  Execution Sandbox |           |
-                               |  (Docker isolation)|           |
-                               +---------+---------+           |
-                                         |                     |
-                                         v                     |
-                               +---------+---------+           |
-                               | Evaluation Engine  |           |
-                               | L1: Compilation    |           |
-                               | L2: Unit Tests     |           |
-                               | L3: Integration    |           |
-                               | L4: Adversarial    |           |
-                               | L5: Spec Compliance|           |
-                               | L6: Architecture   |           |
-                               | L7: Regression     |           |
-                               +---------+---------+           |
-                                         |                     |
-                          +--------------+--------------+      |
-                          |              |              |      |
-                       PASS          FAIL_SOFT      FAIL_HARD  |
-                          |              |              |      |
-                          v              v              v      |
-               +----------+--+  +--------+---+  +------+---+  |
-               | World State |  | Retry with |  | Escalate |  |
-               | Ledger      |  | error ctx  +->| or mark  |  |
-               | (commit)    |  +------------+  | failed   |  |
-               +------+------+                  +-----+----+  |
-                      |                               |        |
-     +----------------+----------------+              |        |
-     |                |                |              +--------+
-     v                v                v
-+----+------+  +------+------+  +-----+-------+
-| Knowledge |  | Economic    |  | Security    |
-| Memory    |  | Governor    |  | Immune      |
-| [P3]      |  | [P3]        |  | [P3]        |
-+-----------+  +-------------+  +-------------+
+```mermaid
+flowchart TD
+    USER --> CLI["CLI / API GW (apps/)"]
+    CLI --> SpecEngine["Spec Engine [P2]"]
+    CLI --> HumanInterface["Human Interface [P5]"]
+    SpecEngine --> TGE
 
-     +-------------------+    +-------------------+
-     | Deployment        |    | Failure Taxonomy  |
-     | Pipeline [P4]     |    | [P4]              |
-     +-------------------+    +-------------------+
+    TGE["Task Graph Engine (DAG + scheduler)"]
+    TGE --> MMR["Multi-Model Router [P2]"]
+    TGE --> ACB["Agent Comm Bus [P2]"]
+    TGE --> CodingAgent["Coding Agent"]
+
+    CodingAgent --> Sandbox["Execution Sandbox (Docker)"]
+    Sandbox --> EvalEngine["Evaluation Engine (L1–L7)"]
+
+    EvalEngine -->|PASS| WSL["World State Ledger"]
+    EvalEngine -->|FAIL_SOFT| Retry["Retry with error context"]
+    EvalEngine -->|FAIL_HARD| Escalate["Escalate or mark failed"]
+
+    Retry --> CodingAgent
+    Escalate --> TGE
+
+    WSL --> KM["Knowledge Memory [P3]"]
+    WSL --> EG["Economic Governor [P3]"]
+    WSL --> SI["Security Immune [P3]"]
+
+    KM & EG & SI --> DP["Deployment Pipeline [P4]"]
+    KM & EG & SI --> FT["Failure Taxonomy [P4]"]
 ```
 
 ---
@@ -346,21 +302,12 @@ The complete lifecycle of a task from submission to completion:
 
 No component directly mutates the world state. Instead:
 
-```
-Agent produces output
-       |
-       v
-Proposal created (list of StateMutations with dot-paths)
-       |
-       v
-Validator checks:
-  - old_value matches current state (optimistic concurrency)
-  - budget constraints not violated
-  - mutation paths are valid
-       |
-       +-- VALID --> Atomic commit: new ledger version, cache update, events published
-       |
-       +-- INVALID --> Rejection with reason, event published
+```mermaid
+flowchart TD
+    A["Agent produces output"] --> B["Proposal created (list of StateMutations with dot-paths)"]
+    B --> C{"Validator: old_value matches? Budget ok? Paths valid?"}
+    C -->|VALID| D["Atomic commit: new ledger version, cache update, events published"]
+    C -->|INVALID| E["Rejection with reason, event published"]
 ```
 
 Each `StateMutation` contains:
