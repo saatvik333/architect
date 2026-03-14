@@ -159,21 +159,27 @@ ARCHITECT is designed for increasing autonomy, not full autonomy from day one. E
 
 ---
 
-### 4. Evaluation Engine (Phase 1) -- IMPLEMENTED
+### 4. Evaluation Engine (Phase 1+2) -- IMPLEMENTED
 
-**Purpose:** Multi-layer evaluation pipeline that determines whether generated code meets quality standards. Evaluation is fail-fast by default -- a FAIL_HARD in an early layer skips remaining layers.
+**Purpose:** 7-layer evaluation pipeline that determines whether generated code meets quality standards. Evaluation is fail-fast by default -- a FAIL_HARD in an early layer skips remaining layers.
 
 **Key abstractions:**
-- `Evaluator` -- Orchestrates the layer pipeline. Runs each layer in sequence, publishes per-layer events, computes overall verdict
+
+- `Evaluator` -- Orchestrates the layer pipeline. Runs each layer in sequence, publishes per-layer events, computes overall verdict. Configurable via `enabled_layers` setting
 - `EvalLayerBase` -- Abstract base class defining the `evaluate(sandbox_session_id) -> LayerEvaluation` contract
-- `CompilationLayer` -- Runs `python -m py_compile` on all Python files. FAIL_HARD on syntax errors
-- `UnitTestLayer` -- Runs `pytest` in the sandbox. FAIL_SOFT on test failures (retryable), FAIL_HARD on complete breakage
+- `CompilationLayer` (L1) -- Runs `python -m py_compile` on all Python files. FAIL_HARD on syntax errors
+- `UnitTestLayer` (L2) -- Runs `pytest` in the sandbox. FAIL_SOFT on test failures, FAIL_HARD on complete breakage
+- `IntegrationTestLayer` (L3) -- Runs `pytest -m integration`. FAIL_SOFT on failures, FAIL_HARD on collection errors
+- `AdversarialLayer` (L4) -- Uses LLM to generate attack vectors (edge cases, injection, nulls), runs them in sandbox. Severity-based verdicts
+- `SpecComplianceLayer` (L5) -- Fuzzy-matches acceptance criteria to test names. Score-based: >=50% met → FAIL_SOFT, <50% → FAIL_HARD
+- `ArchitectureComplianceLayer` (L6) -- Checks for cross-service imports, runs ruff lint. Import violations → FAIL_HARD
+- `RegressionLayer` (L7) -- Runs full test suite, compares against baseline count. Regressions → FAIL_HARD
 - `EvaluationReport` -- Aggregates all layer results with an overall `EvalVerdict` (PASS / FAIL_SOFT / FAIL_HARD)
 - `LayerEvaluation` -- Per-layer result containing the layer name, verdict, detailed results, and timestamps
 
-**Communication:** Publishes `eval.layer_completed` and `eval.completed` events. Reads from sandboxes via `SandboxClient`. Results are consumed by the Task Graph Engine to determine task completion or retry.
+**Communication:** Publishes `eval.layer_completed` and `eval.completed` events. Reads from sandboxes via `SandboxClient`. The adversarial layer uses `LLMClient` for attack vector generation. Results are consumed by the Task Graph Engine to determine task completion or retry.
 
-**Implementation:** `services/evaluation-engine/` -- `evaluator.py`, `layers/base.py`, `layers/compilation.py`, `layers/unit_tests.py`, `models.py`.
+**Implementation:** `services/evaluation-engine/` -- `evaluator.py`, `layers/base.py`, `layers/compilation.py`, `layers/unit_tests.py`, `layers/integration_tests.py`, `layers/adversarial.py`, `layers/spec_compliance.py`, `layers/architecture.py`, `layers/regression.py`, `models.py`.
 
 ---
 
@@ -195,27 +201,71 @@ ARCHITECT is designed for increasing autonomy, not full autonomy from day one. E
 
 ---
 
-### 6. Spec Engine (Phase 2) -- STUB
+### 6. Spec Engine (Phase 2) -- IMPLEMENTED
 
-**Purpose:** Will parse, validate, version, and diff project specifications. Converts natural language or structured input into a canonical spec format consumable by the Task Graph Engine.
+**Purpose:** Transforms vague natural-language task descriptions into formal, testable specifications via Claude LLM. If the input is ambiguous, returns clarification questions instead of guessing.
+
+**Key abstractions:**
+- `TaskSpec` -- Frozen Pydantic model containing intent, constraints, success criteria (list of `AcceptanceCriterion`), file targets, assumptions, and open questions
+- `AcceptanceCriterion` -- Each criterion has an ID, description, test type (`unit`/`integration`/`adversarial`), and `automated` flag
+- `SpecParser` -- Takes raw text + optional clarification answers, calls Claude with a structured prompt, returns `SpecResult` (either a `TaskSpec` or a list of `ClarificationQuestion`)
+- `SpecValidator` -- Validates spec completeness: non-empty intent, at least one criterion, no duplicate IDs
+- `SpecificationWorkflow` -- Temporal workflow: parse → validate → return. Versioned with `workflow.patched("v1-spec-engine-baseline")`
+
+**Communication:** Publishes `spec.created`, `spec.clarification_needed`, `spec.finalized` events. Uses `LLMClient` from `architect-llm` for Claude API calls.
+
+**Implementation:** `services/spec-engine/` -- `parser.py`, `validator.py`, `models.py`, FastAPI routes (`POST /api/v1/specs`, `GET /api/v1/specs/{id}`, `POST /api/v1/specs/{id}/clarify`), Temporal workflow + activities. Port 8010.
 
 ---
 
-### 7. Multi-Model Router (Phase 2) -- STUB
+### 7. Multi-Model Router (Phase 2) -- IMPLEMENTED
 
-**Purpose:** Will route LLM requests to the optimal model tier based on task complexity, budget constraints, and historical performance. See the Multi-Model Routing section below.
+**Purpose:** Routes tasks to the cheapest model tier that can reliably handle them, with automatic escalation on failure.
+
+**Key abstractions:**
+- `ComplexityScorer` -- Scores task complexity 0.0--1.0 based on weighted factors: task type (review=0.8, fix_bug=0.7, implement=0.5, refactor=0.4, test=0.2), token estimate, description length, and keyword signals ("security", "concurrent", "migration" increase score)
+- `Router` -- Maps complexity scores to model tiers via configurable thresholds (>0.7 → Tier 1/Opus, >0.3 → Tier 2/Sonnet, else → Tier 3/Haiku). Static overrides: `REVIEW_CODE` always Tier 1, `WRITE_TEST` always Tier 3
+- `EscalationPolicy` -- Tracks failures per task. After `max_tier_failures` (default 2) at one tier, escalates: Tier 3 → Tier 2 → Tier 1 → human. Reset on success
+- `RoutingDecision` -- Immutable record of task ID, selected tier, model ID, complexity score, and optional override reason
+- `RoutingStats` -- Aggregate counters: total requests, tier distribution, escalation count, average complexity
+
+**Communication:** Publishes `routing.decision` and `routing.escalation` events. Uses `CostTracker` from `architect-llm` for budget awareness.
+
+**Implementation:** `services/multi-model-router/` -- `scorer.py`, `router.py`, `escalation.py`, `models.py`, FastAPI routes (`POST /api/v1/route`, `GET /api/v1/route/stats`), Temporal activity. Port 8011.
 
 ---
 
-### 8. Codebase Comprehension (Phase 2) -- STUB
+### 8. Codebase Comprehension (Phase 2) -- IMPLEMENTED
 
-**Purpose:** Will build AST-level and embedding-based understanding of the target codebase. Provides context to the Coding Agent about existing code structure, patterns, and conventions.
+**Purpose:** Gives agents deep, accurate understanding of the target codebase through AST analysis. Pure Python -- no LLM calls needed.
+
+**Key abstractions:**
+- `ASTIndexer` -- Parses Python files with the `ast` module, extracts functions (sync/async, parameters, return types, decorators, calls), classes (bases, methods, docstrings), and imports (absolute/relative)
+- `CallGraphBuilder` -- Builds forward and reverse call graphs from `FunctionDef.calls` across all indexed files. Key format: `file_path::function_name`
+- `ConventionExtractor` -- Detects naming patterns (snake_case functions, PascalCase classes), file organization, common patterns (async usage, decorator prevalence), and test patterns
+- `ContextAssembler` -- Given a task description, performs keyword-based search across the index, finds relevant files and symbols, discovers related test files, and builds import graphs
+- `IndexStore` -- In-memory dict-based storage for `CodebaseIndex` instances with case-insensitive symbol search
+
+**Communication:** Stateless service. No events published. Agents call the REST API to index directories and retrieve context.
+
+**Implementation:** `services/codebase-comprehension/` -- `ast_indexer.py`, `call_graph.py`, `convention_extractor.py`, `context_assembler.py`, `index_store.py`, `models.py`, FastAPI routes (`POST /api/v1/index`, `GET /api/v1/context`, `GET /api/v1/symbols`). Port 8012.
 
 ---
 
-### 9. Agent Comm Bus (Phase 2) -- STUB
+### 9. Agent Comm Bus (Phase 2) -- IMPLEMENTED
 
-**Purpose:** Will provide NATS-backed inter-agent messaging for coordination, work-stealing, and collaborative problem-solving between multiple concurrent agents.
+**Purpose:** Provides typed inter-agent messaging over NATS JetStream for coordination, context sharing, and escalation.
+
+**Key abstractions:**
+- `MessageBus` -- Wraps `nats.py` async client. Supports publish (fire-and-forget), subscribe (with optional queue groups for load balancing), and request/reply (with configurable timeout). Manages JetStream stream creation and subscription lifecycle
+- `AgentMessage` -- Frozen Pydantic model with sender (`AgentId`), optional recipient (None = broadcast), `MessageType`, payload dict, correlation ID, and timestamp
+- `MessageType` -- 8 typed variants: `task.assigned`, `task.completed`, `context.request`, `context.response`, `state.proposal`, `escalation`, `disagreement`, `knowledge.update`
+- `DeadLetterHandler` -- In-memory DLQ for messages that fail processing. Supports inspection, retry, and purge
+- `MessageStats` -- Aggregate counters: published, received, by-type breakdown, dead letter count, active subscriptions
+
+**Communication:** Publishes `message.published` and `message.dead_lettered` events. All inter-agent messages flow through the NATS `ARCHITECT` stream.
+
+**Implementation:** `services/agent-comm-bus/` -- `bus.py`, `dead_letter.py`, `models.py`, FastAPI routes (`GET /api/v1/bus/health`, `GET /api/v1/bus/stats`, `POST /api/v1/bus/publish`). Port 8013.
 
 ---
 
@@ -274,7 +324,11 @@ The complete lifecycle of a task from submission to completion:
 5. **Evaluation Engine runs the pipeline** against the sandbox:
    - **L1 Compilation:** `py_compile` on all Python files
    - **L2 Unit Tests:** `pytest` execution with failure parsing
-   - (L3--L7 in later phases)
+   - **L3 Integration Tests:** `pytest -m integration` for cross-module checks
+   - **L4 Adversarial:** LLM-generated edge cases, injection tests, malicious inputs
+   - **L5 Spec Compliance:** Acceptance criteria matched against passing tests
+   - **L6 Architecture:** Cross-service import checks, lint violations
+   - **L7 Regression:** Full test suite compared against baseline count
 
 6. **If PASS:** The task is marked completed. The scheduler unblocks dependent tasks and picks the next one. A proposal is submitted to the World State Ledger recording the state change.
 
@@ -326,35 +380,36 @@ Redis serves as the hot cache for the current world state snapshot. The `StateCa
 
 ---
 
-## Multi-Model Routing (Phase 2+)
+## Multi-Model Routing (Implemented)
 
 The system defines three model tiers in `architect_common.enums.ModelTier`:
 
-| Tier | Class | Use Cases |
-|------|-------|-----------|
-| **Tier 1** (Opus) | Maximum capability | Architecture decisions, security review, novel problem-solving, complex refactors |
-| **Tier 2** (Sonnet) | Balanced | Feature implementation, test writing, code review, task decomposition |
-| **Tier 3** (Haiku) | Fast and cheap | Scaffolding, boilerplate generation, formatting, simple fixes |
+| Tier | Class | Model ID | Use Cases |
+|------|-------|----------|-----------|
+| **Tier 1** (Opus) | Maximum capability | `claude-opus-4-20250514` | Architecture decisions, security review, code review (static override) |
+| **Tier 2** (Sonnet) | Balanced | `claude-sonnet-4-20250514` | Feature implementation, bug fixes, task decomposition |
+| **Tier 3** (Haiku) | Fast and cheap | `claude-haiku-3-20250305` | Scaffolding, test writing (static override), formatting, simple fixes |
 
-In Phase 1, each `Task` carries a `model_tier` field set during decomposition. The Coding Agent uses this to select the model. In Phase 2, the Multi-Model Router will dynamically reassign tiers based on:
-- Task complexity (estimated from spec and dependency depth)
-- Budget remaining vs. budget consumed
-- Historical success rates per tier for similar task types
-- Time pressure (deadline proximity)
+The Multi-Model Router (`services/multi-model-router/`) dynamically assigns tiers based on:
+
+- **Complexity scoring** -- Weighted factors: task type (0.2--0.8), token estimate (linear to 100k), description length, and keyword signals
+- **Static overrides** -- `REVIEW_CODE` always routes to Tier 1, `WRITE_TEST` always routes to Tier 3
+- **Threshold routing** -- Score > 0.7 → Tier 1, > 0.3 → Tier 2, else Tier 3
+- **Escalation policy** -- After 2 failures at a tier, automatically escalates: Tier 3 → Tier 2 → Tier 1 → human. Resets on success
 
 ---
 
 ## Evaluation Layers
 
-| Layer | Name | Phase | Verdict on Failure | Auto-fix Behavior |
-|-------|------|-------|--------------------|-------------------|
-| L1 | Compilation | P1 | FAIL_HARD | Not retryable -- syntax errors must be fixed by regeneration |
-| L2 | Unit Tests | P1 | FAIL_SOFT | Errors fed back to agent for iterative fixing |
-| L3 | Integration Tests | P2 | FAIL_SOFT | Errors fed back with broader context |
-| L4 | Adversarial | P3 | FAIL_SOFT | Edge cases and malicious inputs tested, agent re-generates |
-| L5 | Spec Compliance | P2 | FAIL_HARD | Output must match spec; fundamental misunderstanding is not retryable |
-| L6 | Architecture Review | P3 | FAIL_SOFT | LLM-as-judge reviews design patterns and conventions |
-| L7 | Regression | P4 | FAIL_HARD | Existing tests must not break; regressions block deployment |
+| Layer | Name | Status | Verdict on Failure | Auto-fix Behavior |
+|-------|------|--------|--------------------|--------------------|
+| L1 | Compilation | Implemented | FAIL_HARD | Not retryable -- syntax errors must be fixed by regeneration |
+| L2 | Unit Tests | Implemented | FAIL_SOFT | Errors fed back to agent for iterative fixing |
+| L3 | Integration Tests | Implemented | FAIL_SOFT | Errors fed back with broader context |
+| L4 | Adversarial | Implemented | FAIL_SOFT | LLM-generated edge cases and attack vectors, severity-based |
+| L5 | Spec Compliance | Implemented | FAIL_SOFT/HARD | Fuzzy-matches criteria to tests; <50% met → FAIL_HARD |
+| L6 | Architecture | Implemented | FAIL_SOFT/HARD | Cross-service import violations → FAIL_HARD, lint → FAIL_SOFT |
+| L7 | Regression | Implemented | FAIL_HARD | Full suite must pass; count must meet or exceed baseline |
 
 The evaluator runs layers in order. When `fail_fast=True` (the default), a FAIL_HARD verdict in any layer short-circuits the remaining layers.
 

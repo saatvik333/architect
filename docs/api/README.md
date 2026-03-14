@@ -875,3 +875,270 @@ Get the status and output of a coding agent run.
 | Status | Condition           |
 |--------|---------------------|
 | 404    | Agent run not found |
+
+---
+
+## 6. Spec Engine (Port 8010)
+
+### `POST /api/v1/specs` -- Create Specification
+
+Submit a natural-language task description for parsing into a formal spec.
+
+**Request body:**
+
+```json
+{
+  "raw_text": "Build an OAuth2 login flow with Google that completes in under 2 seconds"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "spec": {
+    "id": "spec-a1b2c3d4e5f6",
+    "intent": "Implement OAuth2 login with Google provider",
+    "constraints": ["Must complete in under 2 seconds", "Must support PKCE flow"],
+    "success_criteria": [
+      {
+        "id": "ac-1a2b3c4d",
+        "description": "OAuth2 login with Google completes in < 2s",
+        "test_type": "integration",
+        "automated": true
+      }
+    ],
+    "file_targets": ["src/auth/oauth.py", "src/auth/providers/google.py"],
+    "assumptions": ["PostgreSQL is the primary datastore"],
+    "open_questions": [],
+    "created_at": "2026-03-14T12:00:00Z"
+  },
+  "needs_clarification": false,
+  "questions": []
+}
+```
+
+If the input is ambiguous, `needs_clarification` is `true` and `spec` is `null`:
+
+```json
+{
+  "spec": null,
+  "needs_clarification": true,
+  "questions": [
+    {
+      "question": "Which OAuth2 provider should be used?",
+      "context": "The description mentions login but not the identity provider",
+      "priority": "high"
+    }
+  ]
+}
+```
+
+### `GET /api/v1/specs/{spec_id}` -- Get Specification
+
+**Response (200):** Returns the stored `SpecResult` for the given ID.
+
+**Errors:**
+
+| Status | Condition |
+|--------|-----------|
+| 404    | Spec not found |
+
+### `POST /api/v1/specs/{spec_id}/clarify` -- Answer Clarifications
+
+**Request body:**
+
+```json
+{
+  "answers": {
+    "Which OAuth2 provider should be used?": "Google"
+  }
+}
+```
+
+**Response (200):** Returns an updated `SpecResult` (may still need further clarification).
+
+---
+
+## 7. Multi-Model Router (Port 8011)
+
+### `POST /api/v1/route` -- Get Routing Decision
+
+**Request body:**
+
+```json
+{
+  "task_id": "task-abc123",
+  "task_type": "implement_feature",
+  "description": "Add rate limiting middleware to the API gateway",
+  "token_estimate": 50000,
+  "keywords": ["middleware", "security"]
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "decision": {
+    "task_id": "task-abc123",
+    "selected_tier": "tier_2",
+    "model_id": "claude-sonnet-4-20250514",
+    "complexity": {
+      "score": 0.55,
+      "factors": {
+        "task_type": 0.5,
+        "token_estimate": 0.5,
+        "description": 0.4,
+        "keywords": 0.7
+      },
+      "recommended_tier": "tier_2"
+    },
+    "override_reason": null,
+    "timestamp": "2026-03-14T12:00:00Z"
+  }
+}
+```
+
+### `GET /api/v1/route/stats` -- Routing Statistics
+
+**Response (200):**
+
+```json
+{
+  "total_requests": 142,
+  "tier_distribution": { "tier_1": 12, "tier_2": 85, "tier_3": 45 },
+  "escalation_count": 7,
+  "average_complexity": 0.43
+}
+```
+
+---
+
+## 8. Codebase Comprehension (Port 8012)
+
+### `POST /api/v1/index` -- Index a Directory
+
+**Request body:**
+
+```json
+{
+  "directory": "/path/to/project",
+  "glob_pattern": "**/*.py"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "root_path": "/path/to/project",
+  "total_files": 47,
+  "total_symbols": 312,
+  "indexed_at": "2026-03-14T12:00:00Z"
+}
+```
+
+### `GET /api/v1/context` -- Get Code Context
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `task_description` | string | Natural-language description of the task |
+
+**Response (200):**
+
+```json
+{
+  "relevant_files": ["src/auth/oauth.py", "src/middleware/rate_limit.py"],
+  "file_chunks": {
+    "src/auth/oauth.py": "class OAuthProvider:\n    ..."
+  },
+  "related_symbols": [
+    {
+      "name": "OAuthProvider",
+      "kind": "class",
+      "file_path": "src/auth/oauth.py",
+      "line_number": 15,
+      "docstring": "Base OAuth2 provider."
+    }
+  ],
+  "related_tests": ["tests/test_auth.py"],
+  "import_graph": {
+    "src/auth/oauth.py": ["src/auth/providers/base.py"]
+  }
+}
+```
+
+### `GET /api/v1/symbols` -- Search Symbols
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | string | | Case-insensitive substring match |
+| `limit` | int | 20 | Max results to return |
+
+**Response (200):** Array of `SymbolInfo` objects.
+
+---
+
+## 9. Agent Communication Bus (Port 8013)
+
+### `GET /api/v1/bus/stats` -- Bus Statistics
+
+**Response (200):**
+
+```json
+{
+  "total_published": 1523,
+  "total_received": 1519,
+  "by_type": {
+    "task.assigned": 200,
+    "task.completed": 185,
+    "context.request": 450,
+    "context.response": 448
+  },
+  "dead_letter_count": 4,
+  "active_subscriptions": 12
+}
+```
+
+### `POST /api/v1/bus/publish` -- Publish Message
+
+**Request body:**
+
+```json
+{
+  "sender": "agent-abc123",
+  "recipient": "agent-def456",
+  "message_type": "context.request",
+  "payload": {
+    "task_id": "task-xyz789",
+    "context_type": "codebase"
+  },
+  "correlation_id": "corr-111222"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "status": "published",
+  "message_id": "msg-a1b2c3d4e5f6"
+}
+```
+
+### `GET /api/v1/bus/health` -- Bus Health
+
+**Response (200):**
+
+```json
+{
+  "status": "healthy",
+  "nats_connected": true,
+  "stream_name": "ARCHITECT"
+}
+```

@@ -21,19 +21,20 @@ python scripts/check-health.py --timeout 10 --wait 60
 ### Individual Service Health
 
 ```bash
+# Phase 1 services
 curl http://localhost:8001/health  # Task Graph Engine
-curl http://localhost:8002/health  # Execution Sandbox
-curl http://localhost:8003/health  # World State Ledger
-curl http://localhost:8004/health  # Spec Engine
-curl http://localhost:8005/health  # Multi-Model Router
-curl http://localhost:8006/health  # Codebase Comprehension
-curl http://localhost:8007/health  # Agent Comm Bus
-curl http://localhost:8008/health  # Knowledge Memory
-curl http://localhost:8009/health  # Economic Governor
-curl http://localhost:8010/health  # Security Immune
-curl http://localhost:8011/health  # Deployment Pipeline
-curl http://localhost:8012/health  # Failure Taxonomy
-curl http://localhost:8013/health  # Human Interface
+curl http://localhost:8002/health  # World State Ledger
+curl http://localhost:8003/health  # Execution Sandbox
+curl http://localhost:8004/health  # Evaluation Engine
+curl http://localhost:8005/health  # Coding Agent
+
+# Phase 2 services
+curl http://localhost:8010/health  # Spec Engine
+curl http://localhost:8011/health  # Multi-Model Router
+curl http://localhost:8012/health  # Codebase Comprehension
+curl http://localhost:8013/health  # Agent Comm Bus
+
+# Gateway (aggregates all above)
 curl http://localhost:8000/health  # API Gateway
 ```
 
