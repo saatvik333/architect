@@ -116,3 +116,38 @@ class BudgetExceededError(BudgetError):
 
 class BudgetWarningError(BudgetError):
     """Budget warning threshold reached."""
+
+
+# ── Specification Engine ─────────────────────────────────────────
+class SpecError(ArchitectError):
+    """Errors related to the Specification Engine."""
+
+
+class SpecAmbiguousError(SpecError):
+    """Specification is too ambiguous to proceed without clarification."""
+
+
+class SpecValidationError(SpecError):
+    """Specification failed validation checks."""
+
+
+# ── Communication Bus ────────────────────────────────────────────
+class CommBusError(ArchitectError):
+    """Errors related to the Agent Communication Bus."""
+
+
+class MessageDeliveryError(CommBusError):
+    """Failed to deliver a message after retries."""
+
+
+class MessageTimeoutError(CommBusError):
+    """Request/reply timed out."""
+
+
+# ── Routing ──────────────────────────────────────────────────────
+class RoutingError(ArchitectError):
+    """Errors related to the Multi-Model Router."""
+
+
+class NoAvailableTierError(RoutingError):
+    """All tiers exhausted; needs human escalation."""

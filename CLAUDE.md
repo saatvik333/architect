@@ -16,6 +16,7 @@ A multi-agent system that replaces the software engineering loop: specify → bu
 - FastAPI, SQLAlchemy (async), Alembic
 - Anthropic SDK (Claude API)
 - Docker for sandboxing
+- Bun (for dashboard app JS/TS tooling — never use npm)
 
 ## Conventions
 - All domain models use Pydantic v2 with `frozen=True` (immutable by default)
@@ -47,5 +48,22 @@ After completing any non-trivial change, automatically:
 1. World State Ledger (Component 2)
 2. Task Graph Engine (Component 3)
 3. Execution Sandbox (Component 7)
-4. Evaluation Engine (Component 8)
-5. Coding Agent
+4. Evaluation Engine (Component 8) — all 7 layers
+5. Coding Agent (Component 5)
+
+## Phase 2 Components (active)
+
+1. Specification Engine (Component 1) — port 8010
+2. Multi-Model Router (Component 4) — port 8011
+3. Codebase Comprehension (Component 5) — port 8012
+4. Agent Communication Bus (Component 6) — port 8013
+5. Dashboard (React/TypeScript SPA) — `apps/dashboard/`, dev port 3000
+
+## Phase 3–5 Components (stubs only)
+
+- Knowledge & Memory (Component 9)
+- Economic Governor (Component 10)
+- Security Immune System (Component 11)
+- Deployment Pipeline (Component 12)
+- Failure Taxonomy (Component 13)
+- Human Interface (Component 14)

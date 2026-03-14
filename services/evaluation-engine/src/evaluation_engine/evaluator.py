@@ -8,8 +8,11 @@ from architect_common.enums import EvalVerdict, EventType
 from architect_common.logging import get_logger
 from architect_common.types import TaskId, utcnow
 from architect_events.schemas import EvalCompletedEvent, EventEnvelope
+from evaluation_engine.layers.architecture import ArchitectureComplianceLayer
 from evaluation_engine.layers.base import EvalLayerBase
 from evaluation_engine.layers.compilation import CompilationLayer
+from evaluation_engine.layers.integration_tests import IntegrationTestLayer
+from evaluation_engine.layers.regression import RegressionLayer
 from evaluation_engine.layers.unit_tests import UnitTestLayer
 from evaluation_engine.models import EvaluationReport, LayerEvaluation
 
@@ -40,14 +43,19 @@ class Evaluator:
         self._event_publisher = event_publisher
         self._fail_fast = fail_fast
 
-        # Default layer stack: compilation then unit tests
+        # Default layer stack: compilation, unit tests, then new layers
         if layers is not None:
             self._layers = layers
         else:
             self._layers = [
                 CompilationLayer(sandbox_client),
                 UnitTestLayer(sandbox_client),
+                IntegrationTestLayer(sandbox_client),
+                ArchitectureComplianceLayer(sandbox_client),
+                RegressionLayer(sandbox_client),
             ]
+            # Note: AdversarialLayer and SpecComplianceLayer need extra deps
+            # (LLMClient and acceptance_criteria respectively). Add when available.
 
     async def evaluate(
         self,

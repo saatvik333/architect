@@ -6,6 +6,10 @@ requires-python = ">=3.12"
 dependencies = [
     "architect-common",
     "architect-llm",
+    "architect-events",
+    "temporalio>=1.9",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
 ]
 
 [build-system]
@@ -18,3 +22,4 @@ packages = ["src/spec_engine"]
 [tool.uv.sources]
 architect-common = { workspace = true }
 architect-llm = { workspace = true }
+architect-events = { workspace = true }

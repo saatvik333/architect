@@ -17,6 +17,10 @@ _SERVICE_URL_MAP = {
     "sandbox": "sandbox_url",
     "eval-engine": "eval_engine_url",
     "coding-agent": "coding_agent_url",
+    "spec-engine": "spec_engine_url",
+    "router": "multi_model_router_url",
+    "codebase": "codebase_comprehension_url",
+    "comm-bus": "agent_comm_bus_url",
 }
 
 
@@ -98,3 +102,37 @@ class ServiceClient:
 
     async def get_service_health(self, service: str) -> dict:
         return await self._request(service, "GET", "/health")
+
+    # ── Phase 2 service methods ───────────────────────────────────
+
+    async def create_spec(self, data: dict) -> dict:
+        return await self._request("spec-engine", "POST", "/api/v1/specs", json=data)
+
+    async def get_spec(self, spec_id: str) -> dict:
+        return await self._request("spec-engine", "GET", f"/api/v1/specs/{spec_id}")
+
+    async def clarify_spec(self, spec_id: str, data: dict) -> dict:
+        return await self._request(
+            "spec-engine", "POST", f"/api/v1/specs/{spec_id}/clarify", json=data
+        )
+
+    async def route_task(self, data: dict) -> dict:
+        return await self._request("router", "POST", "/api/v1/route", json=data)
+
+    async def get_routing_stats(self) -> dict:
+        return await self._request("router", "GET", "/api/v1/route/stats")
+
+    async def index_codebase(self, data: dict) -> dict:
+        return await self._request("codebase", "POST", "/api/v1/index", json=data)
+
+    async def get_code_context(self, params: dict) -> dict:
+        return await self._request("codebase", "GET", "/api/v1/context", params=params)
+
+    async def search_symbols(self, params: dict) -> dict:
+        return await self._request("codebase", "GET", "/api/v1/symbols", params=params)
+
+    async def get_bus_stats(self) -> dict:
+        return await self._request("comm-bus", "GET", "/api/v1/bus/stats")
+
+    async def publish_message(self, data: dict) -> dict:
+        return await self._request("comm-bus", "POST", "/api/v1/bus/publish", json=data)

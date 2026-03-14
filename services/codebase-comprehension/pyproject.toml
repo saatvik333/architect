@@ -5,6 +5,8 @@ description = "Codebase Comprehension — code analysis and understanding for AR
 requires-python = ">=3.12"
 dependencies = [
     "architect-common",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
 ]
 
 [build-system]

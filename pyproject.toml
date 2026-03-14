@@ -50,6 +50,11 @@ known-first-party = [
     "evaluation_engine",
     "coding_agent",
     "architect_cli",
+    "api_gateway",
+    "spec_engine",
+    "multi_model_router",
+    "codebase_comprehension",
+    "agent_comm_bus",
 ]
 
 [tool.ruff.format]

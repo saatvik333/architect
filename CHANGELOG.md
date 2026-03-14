@@ -32,6 +32,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI: new `proposals list/inspect` commands with tabular + JSON output
 - CLI: new `state` command with dot-path filtering and syntax-highlighted JSON
 - CLI `output.py`: `print_table()`, `print_json()`, `print_progress()` helpers
+- **Specification Engine** (Component 1): `SpecParser` with LLM-driven NL→formal spec parsing, `SpecValidator`, clarification detection, Temporal workflow, FastAPI routes (`POST /api/v1/specs`, `GET /api/v1/specs/{id}`, `POST /api/v1/specs/{id}/clarify`)
+- **Multi-Model Router** (Component 4): `ComplexityScorer` with weighted factors (task type, tokens, keywords), `Router` with tier thresholds and static overrides, `EscalationPolicy` (TIER_3→TIER_2→TIER_1→human), FastAPI routes (`POST /api/v1/route`, `GET /api/v1/route/stats`)
+- **Codebase Comprehension** (Component 5): `ASTIndexer` (Python `ast` module), `CallGraphBuilder`, `ConventionExtractor`, `ContextAssembler` with keyword search, `IndexStore` (in-memory), FastAPI routes (`POST /api/v1/index`, `GET /api/v1/context`, `GET /api/v1/symbols`)
+- **Agent Communication Bus** (Component 6): `MessageBus` wrapping NATS JetStream with publish/subscribe/request-reply, `DeadLetterHandler`, 8 typed `MessageType` variants, FastAPI routes (`GET /api/v1/bus/stats`, `POST /api/v1/bus/publish`)
+- Evaluation Engine: 5 new layers — `IntegrationTestLayer`, `AdversarialLayer` (LLM-generated attack vectors), `SpecComplianceLayer`, `ArchitectureComplianceLayer`, `RegressionLayer` — completing all 7 layers from the architecture spec
+- New error types: `SpecError`, `SpecAmbiguousError`, `SpecValidationError`, `CommBusError`, `MessageDeliveryError`, `MessageTimeoutError`, `RoutingError`, `NoAvailableTierError`
+- New `EventType` variants: `SPEC_CREATED`, `SPEC_CLARIFICATION_NEEDED`, `SPEC_FINALIZED`, `ROUTING_DECISION`, `ROUTING_ESCALATION`, `MESSAGE_PUBLISHED`, `MESSAGE_DEAD_LETTERED`
+- Test factories: `make_spec()`, `make_agent_message()`, `make_routing_decision()` in `architect-testing`
+- Dashboard app (`apps/dashboard/`): Vite + React 18 + TypeScript + Tailwind dark-mode SPA with task list, task detail (timeline + logs), health grid, proposals view, 3s polling, `bun run build`
+- API Gateway: proxy routes for all Phase 2 services (specs, routing, codebase indexing, message bus)
+- `nats-py>=2.7` added to agent-comm-bus dependencies
+- `architect-llm` added to evaluation-engine dependencies (for adversarial layer)
 
 ### Changed
 - `SecurityValidator` command blocklist: all patterns now case-insensitive; added full-path variants (`/bin/rm`, `/usr/bin/curl`, etc.); 12 new dangerous patterns (`mknod`, `eval`, `exec`, `LD_PRELOAD`, `/dev/shm`, `find -exec`, `base64 -d`, `/proc/self`, etc.)

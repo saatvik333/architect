@@ -20,6 +20,16 @@ class EvaluationEngineConfig(BaseSettings):
     architect: ArchitectConfig = Field(default_factory=ArchitectConfig)
 
     # ── Evaluation-specific settings ─────────────────────────────────
+    enabled_layers: list[str] = Field(
+        default_factory=lambda: [
+            "compilation",
+            "unit_tests",
+            "integration_tests",
+            "architecture",
+            "regression",
+        ],
+        description="Which eval layers are active.",
+    )
     max_layer_timeout_seconds: int = Field(
         default=300,
         ge=10,

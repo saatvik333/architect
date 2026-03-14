@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "architect-common",
     "architect-events",
+    "architect-llm",
     "architect-sandbox-client",
     "temporalio>=1.9",
     "fastapi>=0.115",
@@ -22,4 +23,5 @@ packages = ["src/evaluation_engine"]
 [tool.uv.sources]
 architect-common = { workspace = true }
 architect-events = { workspace = true }
+architect-llm = { workspace = true }
 architect-sandbox-client = { workspace = true }

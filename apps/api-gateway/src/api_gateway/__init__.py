@@ -85,7 +85,17 @@ async def health_check() -> HealthResponse:
     services: dict[str, str] = {}
     overall = "healthy"
 
-    for service_name in ("task-graph", "world-state", "sandbox", "eval-engine", "coding-agent"):
+    for service_name in (
+        "task-graph",
+        "world-state",
+        "sandbox",
+        "eval-engine",
+        "coding-agent",
+        "spec-engine",
+        "router",
+        "codebase",
+        "comm-bus",
+    ):
         try:
             await _client.get_service_health(service_name)
             services[service_name] = "healthy"
@@ -147,3 +157,75 @@ async def get_world_state() -> WorldStateResponse:
 async def submit_proposal(body: ProposalSubmitRequest) -> dict:
     """Submit a raw proposal to the world state ledger."""
     return await _client.submit_proposal(body.model_dump())
+
+
+# ── Phase 2: Spec Engine ──────────────────────────────────────────
+
+
+@app.post("/api/v1/specs")
+async def create_spec(payload: dict) -> dict:
+    """Submit a natural-language task description for spec parsing."""
+    return await _client.create_spec(payload)
+
+
+@app.get("/api/v1/specs/{spec_id}")
+async def get_spec(spec_id: str) -> dict:
+    """Retrieve a parsed specification."""
+    return await _client.get_spec(spec_id)
+
+
+@app.post("/api/v1/specs/{spec_id}/clarify")
+async def clarify_spec(spec_id: str, payload: dict) -> dict:
+    """Answer clarification questions for an ambiguous spec."""
+    return await _client.clarify_spec(spec_id, payload)
+
+
+# ── Phase 2: Multi-Model Router ──────────────────────────────────
+
+
+@app.post("/api/v1/route")
+async def route_task(payload: dict) -> dict:
+    """Get a routing decision for a task."""
+    return await _client.route_task(payload)
+
+
+@app.get("/api/v1/route/stats")
+async def get_routing_stats() -> dict:
+    """Retrieve routing statistics."""
+    return await _client.get_routing_stats()
+
+
+# ── Phase 2: Codebase Comprehension ──────────────────────────────
+
+
+@app.post("/api/v1/index")
+async def index_codebase(payload: dict) -> dict:
+    """Index a codebase directory."""
+    return await _client.index_codebase(payload)
+
+
+@app.get("/api/v1/context")
+async def get_code_context(task_description: str = "") -> dict:
+    """Get relevant code context for a task description."""
+    return await _client.get_code_context({"task_description": task_description})
+
+
+@app.get("/api/v1/symbols")
+async def search_symbols(query: str = "", limit: int = 20) -> dict:
+    """Search for code symbols."""
+    return await _client.search_symbols({"query": query, "limit": limit})
+
+
+# ── Phase 2: Agent Communication Bus ─────────────────────────────
+
+
+@app.get("/api/v1/bus/stats")
+async def get_bus_stats() -> dict:
+    """Get message bus statistics."""
+    return await _client.get_bus_stats()
+
+
+@app.post("/api/v1/bus/publish")
+async def publish_message(payload: dict) -> dict:
+    """Publish a message to the agent communication bus."""
+    return await _client.publish_message(payload)

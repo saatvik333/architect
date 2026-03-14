@@ -13,12 +13,18 @@ class GatewayConfig(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
-    # Backend service URLs
+    # Backend service URLs — Phase 1
     task_graph_url: str = "http://localhost:8001"
     world_state_url: str = "http://localhost:8002"
     sandbox_url: str = "http://localhost:8003"
     eval_engine_url: str = "http://localhost:8004"
     coding_agent_url: str = "http://localhost:8005"
+
+    # Backend service URLs — Phase 2
+    spec_engine_url: str = "http://localhost:8010"
+    multi_model_router_url: str = "http://localhost:8011"
+    codebase_comprehension_url: str = "http://localhost:8012"
+    agent_comm_bus_url: str = "http://localhost:8013"
 
     # CORS
     cors_origins: list[str] = ["http://localhost:3000"]

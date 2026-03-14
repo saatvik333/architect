@@ -1,6 +1,6 @@
-# ARCHITECT API Reference -- Phase 1 Services
+# ARCHITECT API Reference -- Phase 1 & 2 Services
 
-This document covers the REST APIs exposed by the five Phase 1 services. All services are built on FastAPI, communicate via JSON request/response bodies, and follow shared conventions described below.
+This document covers the REST APIs exposed by the Phase 1 and Phase 2 services. All services are built on FastAPI, communicate via JSON request/response bodies, and follow shared conventions described below.
 
 ## General Conventions
 
@@ -10,12 +10,16 @@ Each service binds to a dedicated port on `localhost` during local development:
 
 | Service              | Port |
 |----------------------|------|
-| **API Gateway**      | 8000 |
-| Task Graph Engine    | 8001 |
-| World State Ledger   | 8002 |
-| Execution Sandbox    | 8003 |
-| Evaluation Engine    | 8004 |
-| Coding Agent         | 8005 |
+| **API Gateway**          | 8000 |
+| Task Graph Engine        | 8001 |
+| World State Ledger       | 8002 |
+| Execution Sandbox        | 8003 |
+| Evaluation Engine        | 8004 |
+| Coding Agent             | 8005 |
+| Spec Engine              | 8010 |
+| Multi-Model Router       | 8011 |
+| Codebase Comprehension   | 8012 |
+| Agent Comm Bus           | 8013 |
 
 ### API Gateway
 
@@ -34,6 +38,16 @@ The API Gateway (`apps/api-gateway`) is the unified HTTP entry point. All client
 | `GET` | `/api/v1/proposals/{proposal_id}` | Get a single proposal |
 | `GET` | `/api/v1/state` | Get current world state |
 | `POST` | `/api/v1/state/proposals` | Submit a raw proposal |
+| `POST` | `/api/v1/specs` | Submit NL description for spec parsing |
+| `GET` | `/api/v1/specs/{spec_id}` | Retrieve a parsed specification |
+| `POST` | `/api/v1/specs/{spec_id}/clarify` | Answer clarification questions |
+| `POST` | `/api/v1/route` | Get a model routing decision |
+| `GET` | `/api/v1/route/stats` | Retrieve routing statistics |
+| `POST` | `/api/v1/index` | Index a codebase directory |
+| `GET` | `/api/v1/context` | Get relevant code context for a task |
+| `GET` | `/api/v1/symbols` | Search for code symbols |
+| `GET` | `/api/v1/bus/stats` | Get message bus statistics |
+| `POST` | `/api/v1/bus/publish` | Publish a message to the agent bus |
 
 Configuration is via environment variables with `ARCHITECT_GATEWAY_` prefix (e.g., `ARCHITECT_GATEWAY_TASK_GRAPH_URL`).
 

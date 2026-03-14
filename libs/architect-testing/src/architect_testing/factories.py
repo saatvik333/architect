@@ -134,3 +134,64 @@ def make_event(**overrides: Any) -> dict[str, Any]:
     }
     defaults.update(overrides)
     return defaults
+
+
+def make_spec(**overrides: Any) -> dict[str, Any]:
+    """Create a spec dict with sensible defaults.
+
+    Represents a parsed task specification::
+
+        spec = make_spec(intent="Implement auth login")
+    """
+    defaults: dict[str, Any] = {
+        "id": f"spec-{new_task_id().removeprefix('task-')}",
+        "intent": "Implement a feature",
+        "constraints": [],
+        "success_criteria": [],
+        "file_targets": [],
+        "assumptions": [],
+        "open_questions": [],
+        "created_at": utcnow().isoformat(),
+    }
+    defaults.update(overrides)
+    return defaults
+
+
+def make_agent_message(**overrides: Any) -> dict[str, Any]:
+    """Create an agent message dict with sensible defaults.
+
+    Represents a typed inter-agent message::
+
+        msg = make_agent_message(message_type="task.assigned")
+    """
+    defaults: dict[str, Any] = {
+        "id": f"msg-{new_event_id().removeprefix('evt-')}",
+        "sender": new_agent_id(),
+        "recipient": None,
+        "message_type": "task.assigned",
+        "payload": {},
+        "correlation_id": None,
+        "timestamp": utcnow().isoformat(),
+        "reply_to": None,
+    }
+    defaults.update(overrides)
+    return defaults
+
+
+def make_routing_decision(**overrides: Any) -> dict[str, Any]:
+    """Create a routing decision dict with sensible defaults.
+
+    Represents a model routing decision::
+
+        decision = make_routing_decision(selected_tier=ModelTier.TIER_1)
+    """
+    defaults: dict[str, Any] = {
+        "task_id": new_task_id(),
+        "selected_tier": ModelTier.TIER_2,
+        "model_id": "claude-sonnet-4-20250514",
+        "complexity": {"score": 0.5, "factors": {}, "recommended_tier": ModelTier.TIER_2},
+        "override_reason": None,
+        "timestamp": utcnow().isoformat(),
+    }
+    defaults.update(overrides)
+    return defaults

@@ -107,6 +107,16 @@ class EventType(StrEnum):
     # Budget
     BUDGET_WARNING = "budget.warning"
     BUDGET_EXHAUSTED = "budget.exhausted"
+    # Specification Engine
+    SPEC_CREATED = "spec.created"
+    SPEC_CLARIFICATION_NEEDED = "spec.clarification_needed"
+    SPEC_FINALIZED = "spec.finalized"
+    # Routing
+    ROUTING_DECISION = "routing.decision"
+    ROUTING_ESCALATION = "routing.escalation"
+    # Communication Bus
+    MESSAGE_PUBLISHED = "message.published"
+    MESSAGE_DEAD_LETTERED = "message.dead_lettered"
 
 
 class EvalLayer(StrEnum):

@@ -35,7 +35,7 @@ class TestHealth:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "healthy"
-        assert len(data["services"]) == 5
+        assert len(data["services"]) == 9
 
     def test_health_one_degraded(self, client: TestClient, mock_client: AsyncMock) -> None:
         call_count = 0
