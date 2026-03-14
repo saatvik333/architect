@@ -30,8 +30,21 @@ def redis_url() -> str:
 
 @pytest.fixture(scope="session")
 def gateway_url() -> str:
-    """API gateway URL from environment or default."""
-    return os.environ.get("ARCHITECT_GATEWAY_URL", "http://localhost:8000")
+    """API gateway URL from environment or default.
+
+    Skips the test session if the gateway is not reachable — these tests
+    require the full service stack and are not expected to run in plain
+    CI (only postgres + redis are available there).
+    """
+    import httpx
+
+    url = os.environ.get("ARCHITECT_GATEWAY_URL", "http://localhost:8000")
+    try:
+        with httpx.Client(timeout=3.0) as client:
+            client.get(f"{url}/health")
+    except Exception:
+        pytest.skip(f"API gateway not reachable at {url} — skipping full-stack integration tests")
+    return url
 
 
 @pytest_asyncio.fixture
