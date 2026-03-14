@@ -34,6 +34,9 @@ class CodingAgentWorkflow:
             ``plan`` (the implementation plan), and ``test_result``
             from the final sandbox execution.
         """
+        # Version gate: establishes baseline for future behavioral changes.
+        workflow.patched("v1-coding-agent-baseline")
+
         max_retries = run_data.get("max_retries", 3)
 
         # Step 1: Plan

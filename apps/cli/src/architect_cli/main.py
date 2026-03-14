@@ -10,6 +10,17 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+# ── Sub-groups ───────────────────────────────────────────────────────
+
+config_app = typer.Typer(help="Manage CLI configuration.")
+app.add_typer(config_app, name="config")
+
+proposals_app = typer.Typer(help="Inspect proposals.")
+app.add_typer(proposals_app, name="proposals")
+
+
+# ── Top-level commands ───────────────────────────────────────────────
+
 
 @app.command()
 def submit(
@@ -105,6 +116,124 @@ def health(
     from architect_cli.commands.health import health as _health
 
     _health(gateway_url, all_services)
+
+
+@app.command()
+def watch(
+    task_id: str = typer.Argument(help="Task ID to watch"),
+    gateway_url: str = typer.Option(
+        "http://localhost:8000",
+        "--gateway-url",
+        envvar="ARCHITECT_GATEWAY_URL",
+        help="API gateway base URL",
+    ),
+    interval: float = typer.Option(2.0, "--interval", "-i", help="Poll interval in seconds"),
+) -> None:
+    """Watch a task's progress with live updates."""
+    from architect_cli.commands.watch import watch as _watch
+
+    _watch(task_id, gateway_url, interval)
+
+
+@app.command()
+def cancel(
+    task_id: str = typer.Argument(help="Task ID to cancel"),
+    gateway_url: str = typer.Option(
+        "http://localhost:8000",
+        "--gateway-url",
+        envvar="ARCHITECT_GATEWAY_URL",
+        help="API gateway base URL",
+    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Also cancel child tasks"),
+) -> None:
+    """Cancel a running task."""
+    from architect_cli.commands.cancel import cancel as _cancel
+
+    _cancel(task_id, gateway_url, force)
+
+
+@app.command()
+def state(
+    gateway_url: str = typer.Option(
+        "http://localhost:8000",
+        "--gateway-url",
+        envvar="ARCHITECT_GATEWAY_URL",
+        help="API gateway base URL",
+    ),
+    path: str | None = typer.Option(None, "--path", "-p", help="Dot-path to filter state"),
+) -> None:
+    """Show world state."""
+    from architect_cli.commands.state import state_show
+
+    state_show(gateway_url, path)
+
+
+# ── Config sub-commands ──────────────────────────────────────────────
+
+
+@config_app.command("show")
+def config_show() -> None:
+    """Display current configuration."""
+    from architect_cli.commands.config import config_show as _show
+
+    _show()
+
+
+@config_app.command("set")
+def config_set(
+    key: str = typer.Argument(help="Config key to set"),
+    value: str = typer.Argument(help="Value to set"),
+) -> None:
+    """Set a configuration value."""
+    from architect_cli.commands.config import config_set as _set
+
+    _set(key, value)
+
+
+@config_app.command("reset")
+def config_reset() -> None:
+    """Reset configuration to defaults."""
+    from architect_cli.commands.config import config_reset as _reset
+
+    _reset()
+
+
+# ── Proposals sub-commands ───────────────────────────────────────────
+
+
+@proposals_app.command("list")
+def proposals_list(
+    task_id: str = typer.Argument(help="Task ID to list proposals for"),
+    gateway_url: str = typer.Option(
+        "http://localhost:8000",
+        "--gateway-url",
+        envvar="ARCHITECT_GATEWAY_URL",
+        help="API gateway base URL",
+    ),
+) -> None:
+    """List proposals for a task."""
+    from architect_cli.commands.proposals import proposals_list as _list
+
+    _list(task_id, gateway_url)
+
+
+@proposals_app.command("inspect")
+def proposals_inspect(
+    proposal_id: str = typer.Argument(help="Proposal ID to inspect"),
+    gateway_url: str = typer.Option(
+        "http://localhost:8000",
+        "--gateway-url",
+        envvar="ARCHITECT_GATEWAY_URL",
+        help="API gateway base URL",
+    ),
+) -> None:
+    """Show detailed proposal with mutations."""
+    from architect_cli.commands.proposals import proposals_inspect as _inspect
+
+    _inspect(proposal_id, gateway_url)
+
+
+# ── Helpers ──────────────────────────────────────────────────────────
 
 
 def _level_color(level: str) -> str:

@@ -19,6 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release: Docker image build and push to GHCR (`ghcr.io/saatvik333/architect/service`) on version tags
 - Release: CHANGELOG entry validation before creating GitHub Release
 - `bandit[toml]` and `pytest-cov` added to dev dependency group
+- Event DLQ: `EventSubscriber` now tracks retry counts per message, moves to `{prefix}:dlq:{event_type}` after `max_retries` failures
+- `EventSubscriber.claim_stale_messages()` using XAUTOCLAIM to reclaim stuck messages
+- `EventSubscriber.get_dlq_messages()` for DLQ inspection
+- `DeadLetterProcessor` class: `reprocess()`, `purge()`, `count()` for DLQ management
+- Temporal `workflow.patched()` version markers on all 3 active workflows (task-graph, evaluation, coding-agent) for safe future migrations
+- API Gateway: full implementation with typed Pydantic models, `ServiceClient` async proxy, CORS, `GatewayConfig` via pydantic-settings, exception handlers
+- API Gateway routes: `POST /api/v1/tasks`, `GET /api/v1/tasks/{id}`, `GET /api/v1/tasks/{id}/logs`, `POST /api/v1/tasks/{id}/cancel`, `GET /api/v1/tasks/{id}/proposals`, `GET /api/v1/proposals/{id}`, `GET /api/v1/state`, `POST /api/v1/state/proposals`
+- CLI: new `config show/set/reset` commands with `~/.config/architect/config.json` persistence
+- CLI: new `watch` command with Rich Live display, progress bar, auto-exit on terminal state
+- CLI: new `cancel` command with `--force` flag for cascading child cancellation
+- CLI: new `proposals list/inspect` commands with tabular + JSON output
+- CLI: new `state` command with dot-path filtering and syntax-highlighted JSON
+- CLI `output.py`: `print_table()`, `print_json()`, `print_progress()` helpers
 
 ### Changed
 - `SecurityValidator` command blocklist: all patterns now case-insensitive; added full-path variants (`/bin/rm`, `/usr/bin/curl`, etc.); 12 new dangerous patterns (`mknod`, `eval`, `exec`, `LD_PRELOAD`, `/dev/shm`, `find -exec`, `base64 -d`, `/proc/self`, etc.)

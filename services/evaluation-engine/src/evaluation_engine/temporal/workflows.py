@@ -29,6 +29,9 @@ class EvaluationWorkflow:
         Returns:
             A dict representation of the :class:`EvaluationReport`.
         """
+        # Version gate: establishes baseline for future behavioral changes.
+        workflow.patched("v1-evaluation-baseline")
+
         result = await workflow.execute_activity(
             run_evaluation,
             args=[task_id, sandbox_session_id],

@@ -10,11 +10,32 @@ Each service binds to a dedicated port on `localhost` during local development:
 
 | Service              | Port |
 |----------------------|------|
-| World State Ledger   | 8001 |
-| Execution Sandbox    | 8002 |
-| Task Graph Engine    | 8003 |
+| **API Gateway**      | 8000 |
+| Task Graph Engine    | 8001 |
+| World State Ledger   | 8002 |
+| Execution Sandbox    | 8003 |
 | Evaluation Engine    | 8004 |
-| Coding Agent         | 8009 |
+| Coding Agent         | 8005 |
+
+### API Gateway
+
+The API Gateway (`apps/api-gateway`) is the unified HTTP entry point. All client requests should go through the gateway, which proxies to backend services.
+
+**Gateway routes:**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Aggregate health check across all services |
+| `POST` | `/api/v1/tasks` | Submit a new task specification |
+| `GET` | `/api/v1/tasks/{task_id}` | Retrieve task status |
+| `GET` | `/api/v1/tasks/{task_id}/logs` | Retrieve task logs |
+| `POST` | `/api/v1/tasks/{task_id}/cancel` | Cancel a running task |
+| `GET` | `/api/v1/tasks/{task_id}/proposals` | List proposals for a task |
+| `GET` | `/api/v1/proposals/{proposal_id}` | Get a single proposal |
+| `GET` | `/api/v1/state` | Get current world state |
+| `POST` | `/api/v1/state/proposals` | Submit a raw proposal |
+
+Configuration is via environment variables with `ARCHITECT_GATEWAY_` prefix (e.g., `ARCHITECT_GATEWAY_TASK_GRAPH_URL`).
 
 ### Error Format
 

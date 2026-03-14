@@ -36,6 +36,9 @@ class TaskOrchestrationWorkflow:
         Returns:
             A summary dict with task results and final status.
         """
+        # Version gate: establishes baseline for future behavioral changes.
+        workflow.patched("v1-task-orchestration-baseline")
+
         # Step 1: Decompose the specification into tasks.
         raw_tasks: list[dict[str, Any]] = await workflow.execute_activity(
             "decompose_spec",
