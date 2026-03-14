@@ -2,6 +2,7 @@
 name = "architect-workspace"
 version = "0.1.0"
 description = "ARCHITECT: Autonomous Recursive Coding Hierarchy for Integrated Task Engineering and Execution"
+license = {file = "LICENSE"}
 requires-python = ">=3.12"
 
 [tool.uv]
