@@ -1,5 +1,5 @@
 
-.PHONY: install install-hooks lint format typecheck test test-integration test-e2e infra-up infra-down migrate dev clean promptfoo-test promptfoo-view run-services run-gateway run-dashboard run-all stop-all
+.PHONY: install install-hooks lint format format-check typecheck test test-integration test-e2e infra-up infra-down migrate dev clean promptfoo-test promptfoo-view run-services run-gateway run-dashboard run-all stop-all
 
 install:
 	uv sync --all-packages --group dev
@@ -15,6 +15,10 @@ lint:
 format:
 	uv run ruff format .
 	uv run ruff check --fix .
+
+format-check:
+	uv run ruff format --check .
+	uv run ruff check .
 
 typecheck:
 	uv run mypy libs/ services/ apps/
@@ -51,10 +55,10 @@ clean:
 	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
 
 promptfoo-test:
-	cd promptfoo && bun run test
+	cd promptfoo && bun install && bun run test
 
 promptfoo-view:
-	cd promptfoo && bun run test:view
+	cd promptfoo && bun install && bun run test:view
 
 # ── Run services ─────────────────────────────────────────────────────
 

@@ -101,7 +101,7 @@ class AdversarialLayer(EvalLayerBase):
         write_and_run_request = ExecutionRequest(
             task_id=session_info.get("task_id", "task-000000000000"),
             agent_id=session_info.get("agent_id", "agent-000000000000"),
-            files={"/tmp/test_adversarial_generated.py": test_code},
+            files={"/tmp/test_adversarial_generated.py": test_code},  # nosec B108 # path inside sandbox container
             commands=[_RUN_ADVERSARIAL_TESTS],
             timeout_seconds=120,
         )

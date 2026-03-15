@@ -25,6 +25,6 @@ class CodebaseComprehensionConfig(BaseSettings):
         ge=1,
         description="Maximum number of files to index in a single directory.",
     )
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # nosec B104 # intended for container deployments
     port: int = Field(default=8012, ge=1, le=65535)
     log_level: str = "INFO"

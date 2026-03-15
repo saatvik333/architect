@@ -41,5 +41,5 @@ class WorldStateLedgerConfig(BaseSettings):
         default="world-state-ledger",
         description="Temporal task queue name for this service.",
     )
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # nosec B104 # intended for container deployments
     port: int = Field(default=8001, ge=1, le=65535)

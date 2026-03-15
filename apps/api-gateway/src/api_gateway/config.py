@@ -10,7 +10,7 @@ class GatewayConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="ARCHITECT_GATEWAY_")
 
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # nosec B104 # intended for container deployments
     port: int = 8000
 
     # Backend service URLs — Phase 1

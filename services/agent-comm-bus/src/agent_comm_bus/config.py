@@ -20,6 +20,6 @@ class AgentCommBusConfig(BaseSettings):
     stream_name: str = "ARCHITECT"
     max_retries: int = Field(default=3, ge=0)
     request_timeout_seconds: float = Field(default=5.0, ge=1.0)
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # nosec B104 # intended for container deployments
     port: int = Field(default=8013, ge=1, le=65535)
     log_level: str = "INFO"

@@ -27,6 +27,6 @@ class SpecEngineConfig(BaseSettings):
         description="Maximum rounds of clarification before forcing a best-effort spec.",
     )
     temporal_task_queue: str = "spec-engine"
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # nosec B104 # intended for container deployments
     port: int = Field(default=8010, ge=1, le=65535)
     log_level: str = "INFO"

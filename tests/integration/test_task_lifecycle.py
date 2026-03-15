@@ -46,7 +46,7 @@ class TestTaskLifecycle:
         resp = await async_http_client.get(f"{gateway_url}/api/v1/tasks/{task_id}")
         assert resp.status_code == 200
         status_data = resp.json()
-        assert status_data["id"] == task_id
+        assert status_data["task_id"] == task_id
         assert status_data["status"] in ("pending", "running", "completed")
 
     @pytest.mark.integration

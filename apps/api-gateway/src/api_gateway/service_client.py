@@ -71,34 +71,34 @@ class ServiceClient:
     # ── Typed methods ────────────────────────────────────────────────
 
     async def submit_task(self, data: dict[str, Any]) -> dict[str, Any]:
-        return await self._request("task-graph", "POST", "/api/v1/tasks", json=data)
+        return await self._request("task-graph", "POST", "/tasks/submit", json=data)
 
     async def get_task_status(self, task_id: str) -> dict[str, Any]:
-        return await self._request("task-graph", "GET", f"/api/v1/tasks/{task_id}")
+        return await self._request("task-graph", "GET", f"/tasks/{task_id}")
 
     async def get_task_logs(self, task_id: str, follow: bool = False) -> dict[str, Any]:
         return await self._request(
-            "task-graph", "GET", f"/api/v1/tasks/{task_id}/logs", params={"follow": follow}
+            "task-graph", "GET", f"/tasks/{task_id}/logs", params={"follow": follow}
         )
 
     async def cancel_task(self, task_id: str, force: bool = False) -> dict[str, Any]:
         return await self._request(
-            "task-graph", "POST", f"/api/v1/tasks/{task_id}/cancel", json={"force": force}
+            "task-graph", "POST", f"/tasks/{task_id}/cancel", json={"force": force}
         )
 
     async def get_proposals(self, task_id: str) -> list[dict[str, Any]]:
         return await self._request(  # type: ignore[return-value]
-            "world-state", "GET", f"/api/v1/tasks/{task_id}/proposals"
+            "world-state", "GET", "/events", params={"task_id": task_id}
         )
 
     async def get_proposal(self, proposal_id: str) -> dict[str, Any]:
-        return await self._request("world-state", "GET", f"/api/v1/proposals/{proposal_id}")
+        return await self._request("world-state", "GET", f"/events/{proposal_id}")
 
     async def submit_proposal(self, data: dict[str, Any]) -> dict[str, Any]:
-        return await self._request("world-state", "POST", "/api/v1/state/proposals", json=data)
+        return await self._request("world-state", "POST", "/proposals", json=data)
 
     async def get_world_state(self) -> dict[str, Any]:
-        return await self._request("world-state", "GET", "/api/v1/state")
+        return await self._request("world-state", "GET", "/state")
 
     async def list_tasks(self, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         return await self._request(  # type: ignore[return-value]

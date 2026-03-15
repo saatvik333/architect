@@ -48,6 +48,6 @@ class EvaluationEngineConfig(BaseSettings):
         default="http://localhost:8002",
         description="Base URL of the Execution Sandbox service.",
     )
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # nosec B104 # intended for container deployments
     port: int = Field(default=8008, ge=1, le=65535)
     log_level: str = "INFO"

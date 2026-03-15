@@ -26,7 +26,7 @@ class TaskGraphEngineConfig(BaseSettings):
     temporal: TemporalConfig = Field(default_factory=TemporalConfig)
     claude: ClaudeConfig = Field(default_factory=ClaudeConfig)
 
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # nosec B104 # intended for container deployments
     port: int = Field(default=8003, ge=1, le=65535)
     log_level: str = "INFO"
 

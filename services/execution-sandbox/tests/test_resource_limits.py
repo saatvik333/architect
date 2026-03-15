@@ -54,7 +54,7 @@ class TestCreateContainerConfig:
 
     def test_tmpfs_mounts_present(self, sample_spec: SandboxSpec) -> None:
         config = create_container_config(sample_spec)
-        assert "/tmp" in config["tmpfs"]
+        assert "/tmp" in config["tmpfs"]  # nosec B108
         assert "/workspace" in config["tmpfs"]
 
     def test_environment_includes_task_and_agent(self, sample_spec: SandboxSpec) -> None:

@@ -87,7 +87,7 @@ def test_response_with_tool_calls() -> None:
         output_tokens=100,
         stop_reason="tool_use",
         tool_calls=[
-            {"id": "call_1", "name": "read_file", "input": {"path": "/tmp/foo.py"}},
+            {"id": "call_1", "name": "read_file", "input": {"path": "/tmp/foo.py"}},  # nosec B108
         ],
     )
     assert resp.tool_calls is not None

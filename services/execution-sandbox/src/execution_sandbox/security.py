@@ -78,7 +78,7 @@ BLOCKED_COMMANDS: list[tuple[re.Pattern[str], str]] = [
     # ── Shared library injection ────────────────────────────────
     (re.compile(r"LD_PRELOAD\s*=", _I), "shared library injection"),
     # ── Shared memory access ────────────────────────────────────
-    (re.compile(r"/dev/shm\b", _I), "shared memory access"),
+    (re.compile(r"/dev/shm\b", _I), "shared memory access"),  # nosec B108 # detection pattern, not usage
     # ── Decode-and-execute patterns ─────────────────────────────
     (re.compile(r"base64\s+-d", _I), "base64 decode (potential code execution)"),
     (re.compile(r"base64\s+--decode", _I), "base64 decode (potential code execution)"),

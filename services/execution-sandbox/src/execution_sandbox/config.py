@@ -31,7 +31,7 @@ class ExecutionSandboxConfig(BaseSettings):
         description="Maximum number of simultaneously running sandbox containers.",
     )
     workspace_root: str = Field(
-        default="/tmp/architect-sandboxes",
+        default="/tmp/architect-sandboxes",  # nosec B108 # configurable default for sandbox workspaces
         description="Host directory for temporary workspace mounts.",
     )
     docker_socket: str = Field(
@@ -58,5 +58,5 @@ class ExecutionSandboxConfig(BaseSettings):
         ge=1_000,
         description="Maximum characters of stderr to store in audit log entries.",
     )
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # nosec B104 # intended for container deployments
     port: int = Field(default=8007, ge=1, le=65535)

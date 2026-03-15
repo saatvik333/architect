@@ -60,9 +60,12 @@ class TestHealth:
 
 class TestCreateTask:
     def test_create_task_success(self, client: TestClient, mock_client: AsyncMock) -> None:
+        # Mock returns task-graph-engine's SubmitSpecResponse format
         mock_client.submit_task.return_value = {
-            "task_id": "task-abc",
-            "status": "accepted",
+            "task_count": 1,
+            "task_ids": ["task-abc"],
+            "execution_order": ["task-abc"],
+            "validation_errors": [],
         }
         resp = client.post(
             "/api/v1/tasks",
@@ -70,6 +73,7 @@ class TestCreateTask:
         )
         assert resp.status_code == 200
         assert resp.json()["task_id"] == "task-abc"
+        assert resp.json()["status"] == "accepted"
 
     def test_create_task_missing_fields(self, client: TestClient) -> None:
         resp = client.post("/api/v1/tasks", json={"name": "only name"})
@@ -78,15 +82,18 @@ class TestCreateTask:
 
 class TestGetTask:
     def test_get_task_success(self, client: TestClient, mock_client: AsyncMock) -> None:
+        # Mock returns task-graph-engine's TaskResponse format
         mock_client.get_task_status.return_value = {
-            "task_id": "task-abc",
-            "name": "Test",
+            "id": "task-abc",
+            "description": "Test",
             "status": "running",
-            "progress": 0.5,
+            "type": "function",
+            "priority": 5,
         }
         resp = client.get("/api/v1/tasks/task-abc")
         assert resp.status_code == 200
         assert resp.json()["status"] == "running"
+        assert resp.json()["task_id"] == "task-abc"
 
     def test_get_task_backend_error(self, client: TestClient, mock_client: AsyncMock) -> None:
         mock_resp = AsyncMock()

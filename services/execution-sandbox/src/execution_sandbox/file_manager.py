@@ -20,7 +20,7 @@ class FileManager:
     Docker containers.
     """
 
-    def __init__(self, workspace_root: str = "/tmp/architect-sandboxes") -> None:
+    def __init__(self, workspace_root: str = "/tmp/architect-sandboxes") -> None:  # nosec B108 # configurable default for sandbox workspaces
         self._workspace_root = workspace_root
         os.makedirs(self._workspace_root, exist_ok=True)
 

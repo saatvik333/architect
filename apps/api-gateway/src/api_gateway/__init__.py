@@ -124,21 +124,45 @@ async def list_tasks(
         params["status"] = status
     if task_type is not None:
         params["type"] = task_type
-    return await _client.list_tasks(params)
+    result = await _client.list_tasks(params)
+    # task-graph returns {"tasks": [...], "total": N}, extract the list
+    if isinstance(result, dict) and "tasks" in result:
+        return result["tasks"]  # type: ignore[return-value]
+    return result  # type: ignore[return-value]
 
 
 @app.post("/api/v1/tasks")
 async def create_task(payload: TaskSubmitRequest) -> TaskSubmitResponse:
     """Submit a new task specification."""
-    result = await _client.submit_task(payload.model_dump())
-    return TaskSubmitResponse.model_validate(result)
+    # Translate gateway request to task-graph-engine's SubmitSpecRequest format
+    spec_payload = {
+        "spec": {
+            "name": payload.name,
+            "description": payload.description,
+            "priority": payload.priority,
+            **(payload.spec or {}),
+        },
+        "use_llm": False,
+    }
+    result = await _client.submit_task(spec_payload)
+    # task-graph returns {task_count, task_ids, execution_order, validation_errors}
+    task_ids = result.get("task_ids", [])
+    return TaskSubmitResponse(
+        task_id=task_ids[0] if task_ids else "unknown",
+        status="accepted",
+    )
 
 
 @app.get("/api/v1/tasks/{task_id}")
 async def get_task(task_id: str) -> TaskStatusResponse:
     """Retrieve task status."""
     result = await _client.get_task_status(task_id)
-    return TaskStatusResponse.model_validate(result)
+    # task-graph returns TaskResponse with 'id', translate to gateway's 'task_id'
+    return TaskStatusResponse(
+        task_id=result.get("id", task_id),
+        name=result.get("description", ""),
+        status=result.get("status", "unknown"),
+    )
 
 
 @app.get("/api/v1/tasks/{task_id}/logs")

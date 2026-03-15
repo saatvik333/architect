@@ -104,26 +104,23 @@ class VectorStore:
         engine = await self._get_engine()
 
         # Build the query using pgvector's cosine distance operator
-        where_clause = ""
         params: dict[str, Any] = {"embedding": str(query_embedding), "limit": limit}
         if root_path is not None:
-            where_clause = "WHERE root_path = :root_path"
             params["root_path"] = root_path
-
-        query = text(f"""
-            SELECT
-                symbol_name,
-                symbol_kind,
-                file_path,
-                line_number,
-                source_chunk,
-                1 - (embedding <=> :embedding::vector) AS score,
-                metadata
-            FROM code_embeddings
-            {where_clause}
-            ORDER BY embedding <=> :embedding::vector
-            LIMIT :limit
-        """)
+            query = text(
+                "SELECT symbol_name, symbol_kind, file_path, line_number, "
+                "source_chunk, 1 - (embedding <=> :embedding::vector) AS score, "
+                "metadata FROM code_embeddings "
+                "WHERE root_path = :root_path "
+                "ORDER BY embedding <=> :embedding::vector LIMIT :limit"
+            )
+        else:
+            query = text(
+                "SELECT symbol_name, symbol_kind, file_path, line_number, "
+                "source_chunk, 1 - (embedding <=> :embedding::vector) AS score, "
+                "metadata FROM code_embeddings "
+                "ORDER BY embedding <=> :embedding::vector LIMIT :limit"
+            )
 
         async with AsyncSession(engine) as session:
             result = await session.execute(query, params)

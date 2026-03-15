@@ -30,7 +30,7 @@ def create_container_config(spec: SandboxSpec) -> dict[str, Any]:
     network_mode = "none" if not network.allow_egress else "bridge"
 
     # Tmpfs mounts for writable areas on a read-only rootfs
-    tmpfs = {
+    tmpfs = {  # nosec B108 # tmpfs mounts inside Docker container
         "/tmp": f"size={limits.disk_mb}m,mode=1777",
         "/workspace": f"size={limits.disk_mb}m,mode=1777",
     }

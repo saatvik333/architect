@@ -72,7 +72,7 @@ jobs:
           cache-dependency-glob: "uv.lock"
       - run: uv sync --all-packages --group dev --locked
       - name: Bandit SAST scan
-        run: uv run bandit -r libs/ services/ apps/ -ll --exclude tests -f json -o bandit-report.json || true
+        run: uv run bandit -r libs/ services/ apps/ -ll --exclude "tests,*/tests" -f json -o bandit-report.json || true
       - name: Upload Bandit results
         uses: actions/upload-artifact@v7
         with:
