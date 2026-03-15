@@ -20,7 +20,9 @@ class TestPythonFunctions:
     """Test extraction of Python function definitions."""
 
     def test_simple_function(self, ts_indexer: TreeSitterIndexer) -> None:
-        source = 'def greet(name: str) -> str:\n    """Say hello."""\n    return f"Hello, {name}!"\n'
+        source = (
+            'def greet(name: str) -> str:\n    """Say hello."""\n    return f"Hello, {name}!"\n'
+        )
         result = ts_indexer.index_file(source, "greet.py", "python")
 
         assert result.path == "greet.py"

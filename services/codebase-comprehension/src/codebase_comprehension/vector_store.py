@@ -163,9 +163,7 @@ class VectorStore:
         engine = await self._get_engine()
         async with AsyncSession(engine) as session:
             result = await session.execute(
-                text(
-                    "SELECT EXISTS(SELECT 1 FROM code_embeddings WHERE root_path = :root_path)"
-                ),
+                text("SELECT EXISTS(SELECT 1 FROM code_embeddings WHERE root_path = :root_path)"),
                 {"root_path": root_path},
             )
             row = result.fetchone()

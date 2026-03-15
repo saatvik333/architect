@@ -22,8 +22,16 @@ from coding_agent.temporal.workflows import CodingAgentWorkflow
 MOCK_PLAN = "## Plan\n1. Create module\n2. Add function\n3. Write tests"
 
 MOCK_FILES = [
-    {"path": "src/calculator.py", "content": "def add(a, b):\n    return a + b\n", "is_test": False},
-    {"path": "tests/test_calculator.py", "content": "def test_add():\n    assert add(1, 2) == 3\n", "is_test": True},
+    {
+        "path": "src/calculator.py",
+        "content": "def add(a, b):\n    return a + b\n",
+        "is_test": False,
+    },
+    {
+        "path": "tests/test_calculator.py",
+        "content": "def test_add():\n    assert add(1, 2) == 3\n",
+        "is_test": True,
+    },
 ]
 
 MOCK_COMMIT_HASH = "abc123def456789012345678901234567890abcd"
@@ -48,8 +56,7 @@ async def mock_execute_in_sandbox(
     """Return a successful sandbox execution result."""
     return {
         "command_results": [
-            {"command": cmd, "exit_code": 0, "stdout": "ok", "stderr": ""}
-            for cmd in commands
+            {"command": cmd, "exit_code": 0, "stdout": "ok", "stderr": ""} for cmd in commands
         ],
     }
 
@@ -163,17 +170,20 @@ class TestCodingWorkflowE2E:
 
     async def test_full_coding_workflow(self) -> None:
         """Happy path: plan -> generate -> test -> commit -> update WSL."""
-        async with await WorkflowEnvironment.start_local() as env, Worker(
-            env.client,
-            task_queue="test-coding-agent",
-            workflows=[CodingAgentWorkflow],
-            activities=[
-                mock_plan_task,
-                mock_generate_code,
-                mock_execute_in_sandbox,
-                mock_commit_code,
-                mock_update_world_state,
-            ],
+        async with (
+            await WorkflowEnvironment.start_local() as env,
+            Worker(
+                env.client,
+                task_queue="test-coding-agent",
+                workflows=[CodingAgentWorkflow],
+                activities=[
+                    mock_plan_task,
+                    mock_generate_code,
+                    mock_execute_in_sandbox,
+                    mock_commit_code,
+                    mock_update_world_state,
+                ],
+            ),
         ):
             run_data = _make_run_data()
             result = await env.client.execute_workflow(
@@ -200,17 +210,20 @@ class TestCodingWorkflowE2E:
         _commit_called = False
         _wsl_called = False
 
-        async with await WorkflowEnvironment.start_local() as env, Worker(
-            env.client,
-            task_queue="test-coding-agent-fail",
-            workflows=[CodingAgentWorkflow],
-            activities=[
-                mock_plan_task,
-                mock_generate_code,
-                mock_execute_in_sandbox_fail,
-                mock_commit_code_tracking,
-                mock_update_world_state_tracking,
-            ],
+        async with (
+            await WorkflowEnvironment.start_local() as env,
+            Worker(
+                env.client,
+                task_queue="test-coding-agent-fail",
+                workflows=[CodingAgentWorkflow],
+                activities=[
+                    mock_plan_task,
+                    mock_generate_code,
+                    mock_execute_in_sandbox_fail,
+                    mock_commit_code_tracking,
+                    mock_update_world_state_tracking,
+                ],
+            ),
         ):
             run_data = _make_run_data(max_retries=1)
             result = await env.client.execute_workflow(

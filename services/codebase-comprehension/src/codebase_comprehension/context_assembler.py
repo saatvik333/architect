@@ -95,9 +95,7 @@ class ContextAssembler:
                     query_vec = eg.embed_query(task_description)
                     results = await vs.search(query_vec, root_path=root_path, limit=20)
 
-                    relevant_files = sorted(
-                        {r.file_path for r in results}
-                    )
+                    relevant_files = sorted({r.file_path for r in results})
                     related_symbols = [
                         SymbolInfo(
                             name=r.symbol_name,
@@ -120,9 +118,7 @@ class ContextAssembler:
                     for index in self._index_store._indices.values():
                         for fp, fi in index.files.items():
                             if fp in relevant_files:
-                                import_graph[fp] = [
-                                    imp.module for imp in fi.imports if imp.module
-                                ]
+                                import_graph[fp] = [imp.module for imp in fi.imports if imp.module]
 
                     return CodeContext(
                         relevant_files=relevant_files,

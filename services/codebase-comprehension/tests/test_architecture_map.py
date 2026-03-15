@@ -174,9 +174,7 @@ class TestLayerClassification:
 class TestEmptyIndex:
     """Test with an empty codebase index."""
 
-    def test_empty_index_produces_empty_map(
-        self, generator: ArchitectureMapGenerator
-    ) -> None:
+    def test_empty_index_produces_empty_map(self, generator: ArchitectureMapGenerator) -> None:
         empty = CodebaseIndex(root_path="/empty", files={})
         arch_map = generator.generate(empty)
 

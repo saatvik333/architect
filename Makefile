@@ -1,8 +1,12 @@
 
-.PHONY: install lint format typecheck test test-integration test-e2e infra-up infra-down migrate dev clean promptfoo-test promptfoo-view
+.PHONY: install install-hooks lint format typecheck test test-integration test-e2e infra-up infra-down migrate dev clean promptfoo-test promptfoo-view
 
 install:
 	uv sync --all-packages --group dev
+
+install-hooks:
+	uv run pre-commit install
+	uv run pre-commit install --hook-type pre-push
 
 lint:
 	uv run ruff check .

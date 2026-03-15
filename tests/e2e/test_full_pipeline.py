@@ -74,9 +74,7 @@ class TestFullPipeline:
                 },
             }
 
-            submit_resp = await client.post(
-                f"{gateway_url}/api/v1/tasks", json=task_spec
-            )
+            submit_resp = await client.post(f"{gateway_url}/api/v1/tasks", json=task_spec)
             assert submit_resp.status_code == 200, (
                 f"Task submission failed: {submit_resp.status_code} {submit_resp.text}"
             )

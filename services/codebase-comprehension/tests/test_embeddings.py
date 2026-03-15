@@ -39,18 +39,16 @@ def mock_model() -> MagicMock:
     """Return a mock SentenceTransformer model."""
     model = MagicMock()
     # encode returns numpy arrays with shape (n, 384)
-    model.encode.side_effect = lambda texts, **kwargs: np.random.rand(
-        len(texts), 384
-    ).astype(np.float32)
+    model.encode.side_effect = lambda texts, **kwargs: np.random.rand(len(texts), 384).astype(
+        np.float32
+    )
     return model
 
 
 class TestBatchEmbedding:
     """Test batch embedding of code chunks."""
 
-    def test_embed_chunks(
-        self, sample_chunks: list[CodeChunk], mock_model: MagicMock
-    ) -> None:
+    def test_embed_chunks(self, sample_chunks: list[CodeChunk], mock_model: MagicMock) -> None:
         generator = EmbeddingGenerator()
         generator._model = mock_model
 
@@ -97,8 +95,11 @@ class TestModelLoading:
         generator = EmbeddingGenerator()
         generator._model = None
 
-        with patch.dict("sys.modules", {"sentence_transformers": None}), pytest.raises(ImportError, match="sentence-transformers"):
-                generator._get_model()
+        with (
+            patch.dict("sys.modules", {"sentence_transformers": None}),
+            pytest.raises(ImportError, match="sentence-transformers"),
+        ):
+            generator._get_model()
 
     def test_chunk_to_text_includes_context(self) -> None:
         chunk = CodeChunk(

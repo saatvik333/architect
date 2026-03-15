@@ -212,17 +212,13 @@ class TestRoutingStats:
             task_id=TaskId("task-cplx00001"),
             selected_tier=ModelTier.TIER_2,
             model_id="claude-sonnet-4-20250514",
-            complexity=ComplexityScore(
-                score=0.3, factors={}, recommended_tier=ModelTier.TIER_2
-            ),
+            complexity=ComplexityScore(score=0.3, factors={}, recommended_tier=ModelTier.TIER_2),
         )
         d2 = RoutingDecision(
             task_id=TaskId("task-cplx00002"),
             selected_tier=ModelTier.TIER_1,
             model_id="claude-opus-4-20250514",
-            complexity=ComplexityScore(
-                score=0.7, factors={}, recommended_tier=ModelTier.TIER_1
-            ),
+            complexity=ComplexityScore(score=0.7, factors={}, recommended_tier=ModelTier.TIER_1),
         )
         collector.record_routing(d1, input_tokens=100, output_tokens=50)
         collector.record_routing(d2, input_tokens=100, output_tokens=50)

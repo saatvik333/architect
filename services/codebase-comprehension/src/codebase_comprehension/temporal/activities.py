@@ -47,7 +47,9 @@ async def index_codebase(
     if not root.is_dir():
         raise ValueError(f"Directory does not exist: {directory}")
 
-    indexer: ASTIndexer | TreeSitterIndexer = TreeSitterIndexer() if use_tree_sitter else ASTIndexer()
+    indexer: ASTIndexer | TreeSitterIndexer = (
+        TreeSitterIndexer() if use_tree_sitter else ASTIndexer()
+    )
 
     store = IndexStore()
 
@@ -83,9 +85,7 @@ async def index_codebase(
                 file_index = indexer.index_file(source, rel_path, language)
                 files[rel_path] = file_index
                 total_symbols += (
-                    len(file_index.functions)
-                    + len(file_index.classes)
-                    + len(file_index.imports)
+                    len(file_index.functions) + len(file_index.classes) + len(file_index.imports)
                 )
                 file_count += 1
 

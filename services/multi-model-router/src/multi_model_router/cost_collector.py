@@ -70,9 +70,7 @@ class CostCollector:
 
         # Hypothetical Tier 1 cost
         t1_input, t1_output = _resolve_pricing(_TIER_1_MODEL_ID)
-        self._hypothetical_tier1_cost += (input_tokens * t1_input) + (
-            output_tokens * t1_output
-        )
+        self._hypothetical_tier1_cost += (input_tokens * t1_input) + (output_tokens * t1_output)
 
         # Bookkeeping
         self._total_requests += 1
@@ -136,9 +134,7 @@ class CostCollector:
     def get_stats(self) -> RoutingStats:
         """Return aggregate routing statistics including cost data."""
         avg_complexity = (
-            self._complexity_sum / self._total_requests
-            if self._total_requests > 0
-            else 0.0
+            self._complexity_sum / self._total_requests if self._total_requests > 0 else 0.0
         )
         tier_distribution: dict[str, int] = {}
         total_cost = 0.0

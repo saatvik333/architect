@@ -83,8 +83,7 @@ class ScopeGovernor:
                 {
                     "role": "user",
                     "content": (
-                        f"Evaluate scope for this specification:\n\n"
-                        f"{spec_text}{constraint_text}"
+                        f"Evaluate scope for this specification:\n\n{spec_text}{constraint_text}"
                     ),
                 }
             ],

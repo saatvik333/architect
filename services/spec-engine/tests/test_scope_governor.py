@@ -58,9 +58,7 @@ def mvp_report_json() -> str:
             "deferred_features": ["Push notification support", "Notification templates"],
             "scope_creep_flags": [],
             "estimated_effort_hours": 16.0,
-            "recommendations": [
-                "Start with email only, add SMS in a follow-up iteration"
-            ],
+            "recommendations": ["Start with email only, add SMS in a follow-up iteration"],
         }
     )
 

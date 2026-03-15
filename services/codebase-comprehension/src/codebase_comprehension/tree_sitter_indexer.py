@@ -61,9 +61,7 @@ class TreeSitterIndexer:
     :class:`FileIndex` when the requested language grammar is unavailable.
     """
 
-    def index_file(
-        self, source: str, file_path: str, language: str = "python"
-    ) -> FileIndex:
+    def index_file(self, source: str, file_path: str, language: str = "python") -> FileIndex:
         """Parse *source* with tree-sitter and extract functions, classes, imports.
 
         Returns an empty :class:`FileIndex` when the language is unsupported or
@@ -71,9 +69,7 @@ class TreeSitterIndexer:
         """
         lang_obj = _load_language(language)
         if lang_obj is None:
-            return FileIndex(
-                path=file_path, language=language, line_count=source.count("\n") + 1
-            )
+            return FileIndex(path=file_path, language=language, line_count=source.count("\n") + 1)
 
         try:
             import tree_sitter
@@ -82,9 +78,7 @@ class TreeSitterIndexer:
             tree = parser.parse(source.encode("utf-8"))
         except Exception:
             logger.warning("parse_failed", file_path=file_path, language=language)
-            return FileIndex(
-                path=file_path, language=language, line_count=source.count("\n") + 1
-            )
+            return FileIndex(path=file_path, language=language, line_count=source.count("\n") + 1)
 
         root = tree.root_node
         functions = self._extract_functions(root, file_path, language, source)
@@ -135,13 +129,9 @@ class TreeSitterIndexer:
                 if node_type == "export_statement":
                     for sub in child.children:  # type: ignore[attr-defined]
                         if sub.type == "function_declaration":  # type: ignore[attr-defined]
-                            results.append(
-                                self._parse_js_function(sub, file_path, source)
-                            )
+                            results.append(self._parse_js_function(sub, file_path, source))
                 else:
-                    results.append(
-                        self._parse_js_function(child, file_path, source)
-                    )
+                    results.append(self._parse_js_function(child, file_path, source))
         return results
 
     def _extract_classes(
@@ -172,9 +162,7 @@ class TreeSitterIndexer:
                 if node_type == "export_statement":
                     for sub in child.children:  # type: ignore[attr-defined]
                         if sub.type == "class_declaration":  # type: ignore[attr-defined]
-                            results.append(
-                                self._parse_js_class(sub, file_path, source)
-                            )
+                            results.append(self._parse_js_class(sub, file_path, source))
                 else:
                     results.append(self._parse_js_class(child, file_path, source))
         return results
@@ -191,9 +179,7 @@ class TreeSitterIndexer:
                 if node_type == "import_statement":
                     results.extend(self._parse_python_import(child, file_path, source))
                 elif node_type == "import_from_statement":
-                    results.extend(
-                        self._parse_python_from_import(child, file_path, source)
-                    )
+                    results.extend(self._parse_python_from_import(child, file_path, source))
             elif language in ("javascript", "typescript") and node_type == "import_statement":
                 results.extend(self._parse_js_import(child, file_path, source))
         return results
@@ -246,9 +232,7 @@ class TreeSitterIndexer:
             docstring=docstring,
         )
 
-    def _parse_python_class(
-        self, node: object, file_path: str, source: str
-    ) -> ClassDef:
+    def _parse_python_class(self, node: object, file_path: str, source: str) -> ClassDef:
         """Parse a Python class_definition node."""
         name = ""
         bases: list[str] = []
@@ -283,9 +267,7 @@ class TreeSitterIndexer:
                                 elif dec_child.type == "function_definition":  # type: ignore[attr-defined]
                                     func_node = dec_child
                         methods.append(
-                            self._parse_python_function(
-                                func_node, file_path, source, decorators
-                            )
+                            self._parse_python_function(func_node, file_path, source, decorators)
                         )
 
         return ClassDef(
@@ -297,9 +279,7 @@ class TreeSitterIndexer:
             docstring=docstring,
         )
 
-    def _parse_python_import(
-        self, node: object, file_path: str, source: str
-    ) -> list[ImportInfo]:
+    def _parse_python_import(self, node: object, file_path: str, source: str) -> list[ImportInfo]:
         """Parse a Python ``import x`` statement."""
         results: list[ImportInfo] = []
         for child in node.children:  # type: ignore[attr-defined]
@@ -380,9 +360,7 @@ class TreeSitterIndexer:
 
     # -- JavaScript/TypeScript-specific parsers ------------------------------
 
-    def _parse_js_function(
-        self, node: object, file_path: str, source: str
-    ) -> FunctionDef:
+    def _parse_js_function(self, node: object, file_path: str, source: str) -> FunctionDef:
         """Parse a JS/TS function_declaration node."""
         name = ""
         parameters: list[str] = []
@@ -409,9 +387,7 @@ class TreeSitterIndexer:
             is_async=is_async,
         )
 
-    def _parse_js_class(
-        self, node: object, file_path: str, source: str
-    ) -> ClassDef:
+    def _parse_js_class(self, node: object, file_path: str, source: str) -> ClassDef:
         """Parse a JS/TS class_declaration node."""
         name = ""
         bases: list[str] = []
@@ -430,9 +406,7 @@ class TreeSitterIndexer:
             elif ctype == "class_body":
                 for body_child in child.children:  # type: ignore[attr-defined]
                     if body_child.type == "method_definition":  # type: ignore[attr-defined]
-                        methods.append(
-                            self._parse_js_method(body_child, file_path, source)
-                        )
+                        methods.append(self._parse_js_method(body_child, file_path, source))
 
         return ClassDef(
             name=name,
@@ -442,9 +416,7 @@ class TreeSitterIndexer:
             methods=methods,
         )
 
-    def _parse_js_method(
-        self, node: object, file_path: str, source: str
-    ) -> FunctionDef:
+    def _parse_js_method(self, node: object, file_path: str, source: str) -> FunctionDef:
         """Parse a JS/TS method_definition node."""
         name = ""
         parameters: list[str] = []
@@ -467,9 +439,7 @@ class TreeSitterIndexer:
             parameters=parameters,
         )
 
-    def _parse_js_import(
-        self, node: object, file_path: str, source: str
-    ) -> list[ImportInfo]:
+    def _parse_js_import(self, node: object, file_path: str, source: str) -> list[ImportInfo]:
         """Parse a JS/TS import statement."""
         module = ""
         names: list[str] = []

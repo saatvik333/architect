@@ -45,9 +45,7 @@ class EmbeddingGenerator:
                 "Install it with: pip install sentence-transformers"
             ) from None
 
-    def embed_chunks(
-        self, chunks: list[CodeChunk]
-    ) -> list[tuple[CodeChunk, list[float]]]:
+    def embed_chunks(self, chunks: list[CodeChunk]) -> list[tuple[CodeChunk, list[float]]]:
         """Batch-embed a list of code chunks.
 
         Returns a list of (chunk, embedding_vector) tuples.
