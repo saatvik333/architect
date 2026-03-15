@@ -127,8 +127,8 @@ async def list_tasks(
     result = await _client.list_tasks(params)
     # task-graph returns {"tasks": [...], "total": N}, extract the list
     if isinstance(result, dict) and "tasks" in result:
-        return result["tasks"]  # type: ignore[return-value]
-    return result  # type: ignore[return-value]
+        return result["tasks"]
+    return result
 
 
 @app.post("/api/v1/tasks")
