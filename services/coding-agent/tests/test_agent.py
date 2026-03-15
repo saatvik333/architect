@@ -2,12 +2,27 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from architect_common.enums import SandboxStatus
 from architect_sandbox_client.models import CommandResult, ExecutionResult
 from coding_agent.agent import CodingAgentLoop
 from coding_agent.models import AgentOutput, AgentRun
+
+
+@pytest.fixture(autouse=True)
+def _mock_git_committer():
+    """Prevent agent tests from writing files to the real working directory.
+
+    The default AgentRun.repo_path is "." (CWD), and GitCommitter.commit()
+    writes files to disk before attempting git operations.  Mocking it avoids
+    side-effects on the project tree.
+    """
+    with patch("coding_agent.agent.GitCommitter") as mock_cls:
+        mock_cls.return_value.commit = AsyncMock(return_value="a" * 40)
+        yield mock_cls
 
 
 class TestCodingAgentLoop:
