@@ -47,7 +47,7 @@ The `dev-setup.sh` script handles the full workflow:
 ### Verifying Setup
 
 ```bash
-make test        # 576 tests should pass
+make test        # The full test suite should pass
 make lint        # Should show "All checks passed!"
 make typecheck   # Should pass (mypy strict mode)
 ```

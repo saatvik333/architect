@@ -13,21 +13,18 @@ import sys
 import time
 
 # Service registry: name -> default URL
+# Ports must match Makefile run-services / run-gateway targets.
 SERVICES: dict[str, str] = {
     "api-gateway": "http://localhost:8000",
-    "task-graph-engine": "http://localhost:8001",
-    "execution-sandbox": "http://localhost:8002",
-    "world-state-ledger": "http://localhost:8003",
-    "spec-engine": "http://localhost:8004",
-    "multi-model-router": "http://localhost:8005",
-    "codebase-comprehension": "http://localhost:8006",
-    "agent-comm-bus": "http://localhost:8007",
-    "knowledge-memory": "http://localhost:8008",
-    "economic-governor": "http://localhost:8009",
-    "security-immune": "http://localhost:8010",
-    "deployment-pipeline": "http://localhost:8011",
-    "failure-taxonomy": "http://localhost:8012",
-    "human-interface": "http://localhost:8013",
+    "world-state-ledger": "http://localhost:8001",
+    "task-graph-engine": "http://localhost:8003",
+    "execution-sandbox": "http://localhost:8007",
+    "evaluation-engine": "http://localhost:8008",
+    "coding-agent": "http://localhost:8009",
+    "spec-engine": "http://localhost:8010",
+    "multi-model-router": "http://localhost:8011",
+    "codebase-comprehension": "http://localhost:8012",
+    "agent-comm-bus": "http://localhost:8013",
 }
 
 # ANSI colors

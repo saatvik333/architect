@@ -17,7 +17,7 @@ LedgerVersion = NewType("LedgerVersion", int)
 
 
 def _prefixed_uuid(prefix: str) -> str:
-    return f"{prefix}-{uuid.uuid4().hex[:12]}"
+    return f"{prefix}-{uuid.uuid4().hex}"
 
 
 def new_agent_id() -> AgentId:

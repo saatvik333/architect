@@ -55,7 +55,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
       - run: uv sync --all-packages --group dev --locked
-      - run: uv run pytest libs/ services/ apps/ -x -q --tb=short --cov=libs --cov=services --cov=apps --cov-report=xml
+      - run: uv run pytest libs/ services/ apps/ -x -q --tb=short --cov=libs --cov=services --cov=apps --cov-report=xml --cov-fail-under=60
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
@@ -72,15 +72,17 @@ jobs:
           cache-dependency-glob: "uv.lock"
       - run: uv sync --all-packages --group dev --locked
       - name: Bandit SAST scan
-        run: uv run bandit -r libs/ services/ apps/ -ll --exclude "tests,*/tests" -f json -o bandit-report.json || true
+        run: uv run bandit -r libs/ services/ apps/ -ll --exclude "tests,*/tests" -f json -o bandit-report.json
       - name: Upload Bandit results
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: bandit-report
           path: bandit-report.json
       - name: pip-audit CVE scan
-        run: uv run pip-audit --format json -o pip-audit-report.json || true
+        run: uv run pip-audit --format json -o pip-audit-report.json
       - name: Upload pip-audit results
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: pip-audit-report

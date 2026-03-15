@@ -14,7 +14,7 @@ Please report security issues by emailing the maintainer directly or by using
 Include:
 - A description of the vulnerability and its potential impact
 - Steps to reproduce or a proof-of-concept
-- Any suggested miigation or fix
+- Any suggested mitigation or fix
 
 You will receive a response within 7 days. If the issue is confirmed, a patch
 will be released as soon as possible and you will be credited in the release

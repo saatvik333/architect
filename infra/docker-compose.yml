@@ -1,3 +1,5 @@
+# NOTE: Container image versions are pinned for reproducibility.
+# Review and update these pins periodically (e.g., quarterly).
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -22,7 +24,7 @@ services:
           memory: 512M
 
   redis:
-    image: redis:7
+    image: redis:7.4
     command: redis-server --appendonly yes
     ports:
       - "6379:6379"
@@ -40,7 +42,7 @@ services:
           memory: 256M
 
   temporal:
-    image: temporalio/auto-setup:latest
+    image: temporalio/auto-setup:1.25.2
     environment:
       - DB=postgres12
       - DB_PORT=5432
@@ -60,7 +62,7 @@ services:
           memory: 1G
 
   temporal-ui:
-    image: temporalio/ui:latest
+    image: temporalio/ui:2.34.0
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
     ports:
@@ -74,7 +76,7 @@ services:
           memory: 128M
 
   nats:
-    image: nats:latest
+    image: nats:2.10.24
     command: ["-js", "-m", "8222"]
     ports:
       - "4222:4222"

@@ -8,7 +8,7 @@ from temporalio.client import Client as TemporalClient
 from temporalio.worker import Worker
 
 from architect_common.logging import get_logger
-from world_state_ledger.temporal import activities as act
+from world_state_ledger.temporal.activities import WSLActivities
 
 if TYPE_CHECKING:
     from world_state_ledger.config import WorldStateLedgerConfig
@@ -30,8 +30,7 @@ async def start_temporal_worker(
     event loop alive (typically via ``worker.run()`` or as a background
     task).
     """
-    # Inject live dependencies into the activity module.
-    act.register_dependencies(state_manager, event_log)
+    activities = WSLActivities(state_manager=state_manager, event_log=event_log)
 
     temporal_cfg = config.architect.temporal
     client = await TemporalClient.connect(temporal_cfg.target, namespace=temporal_cfg.namespace)
@@ -40,9 +39,9 @@ async def start_temporal_worker(
         client,
         task_queue=config.temporal_task_queue,
         activities=[
-            act.get_current_state,
-            act.submit_proposal,
-            act.validate_and_commit,
+            activities.get_current_state,
+            activities.submit_proposal,
+            activities.validate_and_commit,
         ],
     )
 

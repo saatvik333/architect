@@ -1,21 +1,28 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
-import Tasks from './pages/Tasks'
-import TaskDetail from './pages/TaskDetail'
-import Health from './pages/Health'
-import Proposals from './pages/Proposals'
+import { ErrorBoundary } from './components/ErrorBoundary'
+
+const Tasks = lazy(() => import('./pages/Tasks'))
+const TaskDetail = lazy(() => import('./pages/TaskDetail'))
+const Health = lazy(() => import('./pages/Health'))
+const Proposals = lazy(() => import('./pages/Proposals'))
 
 function App() {
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Navigate to="/tasks" replace />} />
-        <Route path="/tasks" element={<Tasks />} />
-        <Route path="/tasks/:taskId" element={<TaskDetail />} />
-        <Route path="/health" element={<Health />} />
-        <Route path="/proposals" element={<Proposals />} />
-      </Routes>
-    </Layout>
+    <ErrorBoundary>
+      <Layout>
+        <Suspense fallback={<div className="text-gray-500 p-4">Loading...</div>}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/tasks" replace />} />
+            <Route path="/tasks" element={<Tasks />} />
+            <Route path="/tasks/:taskId" element={<TaskDetail />} />
+            <Route path="/health" element={<Health />} />
+            <Route path="/proposals" element={<Proposals />} />
+          </Routes>
+        </Suspense>
+      </Layout>
+    </ErrorBoundary>
   )
 }
 

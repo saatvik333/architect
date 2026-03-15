@@ -12,7 +12,7 @@ describe('usePolling', () => {
   });
 
   it('starts in loading state', () => {
-    const fetcher = vi.fn(() => new Promise<string>(() => {}));
+    const fetcher = vi.fn((_signal: AbortSignal) => new Promise<string>(() => {}));
     const { result } = renderHook(() => usePolling(fetcher, 5000));
 
     expect(result.current.loading).toBe(true);
@@ -21,7 +21,7 @@ describe('usePolling', () => {
   });
 
   it('resolves data from fetcher', async () => {
-    const fetcher = vi.fn().mockResolvedValue('hello');
+    const fetcher = vi.fn((_signal: AbortSignal) => Promise.resolve('hello'));
     const { result } = renderHook(() => usePolling(fetcher, 5000));
 
     await act(async () => {
@@ -34,7 +34,7 @@ describe('usePolling', () => {
   });
 
   it('sets error when fetcher rejects', async () => {
-    const fetcher = vi.fn().mockRejectedValue(new Error('fail'));
+    const fetcher = vi.fn((_signal: AbortSignal) => Promise.reject(new Error('fail')));
     const { result } = renderHook(() => usePolling(fetcher, 5000));
 
     await act(async () => {
@@ -47,7 +47,7 @@ describe('usePolling', () => {
   });
 
   it('calls fetcher again after interval', async () => {
-    const fetcher = vi.fn().mockResolvedValue('data');
+    const fetcher = vi.fn((_signal: AbortSignal) => Promise.resolve('data'));
     renderHook(() => usePolling(fetcher, 3000));
 
     // Resolve the initial fetch
@@ -66,7 +66,7 @@ describe('usePolling', () => {
   });
 
   it('cleans up interval on unmount', async () => {
-    const fetcher = vi.fn().mockResolvedValue('data');
+    const fetcher = vi.fn((_signal: AbortSignal) => Promise.resolve('data'));
     const { unmount } = renderHook(() => usePolling(fetcher, 3000));
 
     // Resolve the initial fetch
@@ -87,7 +87,7 @@ describe('usePolling', () => {
   });
 
   it('wraps non-Error rejections as Error objects', async () => {
-    const fetcher = vi.fn().mockRejectedValue('string error');
+    const fetcher = vi.fn((_signal: AbortSignal) => Promise.reject('string error'));
     const { result } = renderHook(() => usePolling(fetcher, 5000));
 
     await act(async () => {
@@ -99,9 +99,40 @@ describe('usePolling', () => {
   });
 
   it('performs initial fetch immediately', () => {
-    const fetcher = vi.fn(() => new Promise<string>(() => {}));
+    const fetcher = vi.fn((_signal: AbortSignal) => new Promise<string>(() => {}));
     renderHook(() => usePolling(fetcher, 5000));
 
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes AbortSignal to fetcher', () => {
+    const fetcher = vi.fn((_signal: AbortSignal) => new Promise<string>(() => {}));
+    renderHook(() => usePolling(fetcher, 5000));
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const signal = fetcher.mock.calls[0][0];
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal.aborted).toBe(false);
+  });
+
+  it('aborts in-flight request on unmount', async () => {
+    const fetcher = vi.fn((_signal: AbortSignal) => Promise.resolve('data'));
+    const { unmount } = renderHook(() => usePolling(fetcher, 3000));
+
+    // Resolve the initial fetch
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // Start a new fetch cycle that will be in-flight during unmount
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    const lastCallSignal = fetcher.mock.calls[fetcher.mock.calls.length - 1][0] as AbortSignal;
+
+    unmount();
+
+    expect(lastCallSignal.aborted).toBe(true);
   });
 });

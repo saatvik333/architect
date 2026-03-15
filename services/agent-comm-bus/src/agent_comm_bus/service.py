@@ -33,16 +33,14 @@ def create_app() -> FastAPI:
     return app
 
 
-app = create_app()
-
-
 def main() -> None:
     """CLI entry point: ``python -m agent_comm_bus.service``."""
     import uvicorn
 
     config = get_config()
     uvicorn.run(
-        "agent_comm_bus.service:app",
+        "agent_comm_bus.service:create_app",
+        factory=True,
         host=config.host,
         port=config.port,
         log_level=config.log_level.lower(),

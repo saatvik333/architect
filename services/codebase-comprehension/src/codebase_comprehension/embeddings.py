@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import structlog
@@ -61,6 +62,16 @@ class EmbeddingGenerator:
         for chunk, embedding in zip(chunks, embeddings, strict=True):
             results.append((chunk, embedding.tolist()))
         return results
+
+    async def embed_chunks_async(
+        self, chunks: list[CodeChunk]
+    ) -> list[tuple[CodeChunk, list[float]]]:
+        """Async wrapper around :meth:`embed_chunks`.
+
+        Offloads the blocking ``model.encode()`` call to a thread so the
+        event loop is not blocked during embedding generation.
+        """
+        return await asyncio.to_thread(self.embed_chunks, chunks)
 
     def embed_query(self, text: str) -> list[float]:
         """Embed a single query string.

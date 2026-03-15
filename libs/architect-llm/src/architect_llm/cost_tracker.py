@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+import functools
 from dataclasses import dataclass, field
 
-import structlog
-
 from architect_common.errors import BudgetExceededError
+from architect_common.logging import get_logger
 
-logger = structlog.get_logger()
+logger = get_logger(component="architect_llm.cost_tracker")
 
 # Pricing per token (USD) as of 2025-05 for Anthropic models.
 # Format: {model_prefix: (input_cost_per_token, output_cost_per_token)}
@@ -25,6 +25,7 @@ _MODEL_PRICING: dict[str, tuple[float, float]] = {
 _DEFAULT_PRICING: tuple[float, float] = (3.0 / 1_000_000, 15.0 / 1_000_000)
 
 
+@functools.lru_cache(maxsize=64)
 def _resolve_pricing(model_id: str) -> tuple[float, float]:
     """Match a model_id to its pricing tier by prefix."""
     for prefix, pricing in _MODEL_PRICING.items():
@@ -54,6 +55,7 @@ class CostTracker:
     _models: dict[str, _ModelAccumulator] = field(default_factory=dict)
     max_budget_usd: float | None = None
     warn_thresholds: tuple[float, float] = (0.75, 0.90)
+    _warned_thresholds: set[float] = field(default_factory=set)
 
     def record(self, model_id: str, input_tokens: int, output_tokens: int) -> float:
         """Record a single API call and return its cost in USD."""
@@ -95,14 +97,22 @@ class CostTracker:
             )
 
         ratio = self.total_cost / self.max_budget_usd
-        if ratio >= self.warn_thresholds[1]:
+        if (
+            ratio >= self.warn_thresholds[1]
+            and self.warn_thresholds[1] not in self._warned_thresholds
+        ):
+            self._warned_thresholds.add(self.warn_thresholds[1])
             logger.warning(
                 "Budget 90%+ consumed",
                 total_cost=self.total_cost,
                 max_budget_usd=self.max_budget_usd,
                 usage_ratio=ratio,
             )
-        elif ratio >= self.warn_thresholds[0]:
+        elif (
+            ratio >= self.warn_thresholds[0]
+            and self.warn_thresholds[0] not in self._warned_thresholds
+        ):
+            self._warned_thresholds.add(self.warn_thresholds[0])
             logger.warning(
                 "Budget 75%+ consumed",
                 total_cost=self.total_cost,

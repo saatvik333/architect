@@ -13,24 +13,38 @@ from sqlalchemy.ext.asyncio import (
 def create_engine(
     dsn: str,
     *,
-    pool_min: int = 2,
-    pool_max: int = 10,
+    pool_size: int = 5,
+    max_overflow: int = 5,
+    pool_recycle: int = 1800,
+    pool_timeout: int = 30,
 ) -> AsyncEngine:
     """Create an async SQLAlchemy engine backed by asyncpg.
 
+    Pool sizing rationale: each service opens at most ``pool_size +
+    max_overflow`` connections (5 + 5 = 10).  With 9 services this
+    gives a cluster-wide maximum of 90, safely under the Postgres
+    default ``max_connections = 100``.
+
     Args:
         dsn: PostgreSQL connection string (``postgresql+asyncpg://...``).
-        pool_min: Minimum number of connections in the pool.
-        pool_max: Maximum number of connections in the pool.
+        pool_size: Core number of persistent connections in the pool.
+        max_overflow: Extra connections allowed above *pool_size* under
+            burst load.  These are closed when no longer needed.
+        pool_recycle: Seconds after which a connection is recycled (prevents
+            stale connections from long-lived pools).
+        pool_timeout: Seconds to wait for a connection from the pool before
+            raising a timeout error.
 
     Returns:
         Configured :class:`AsyncEngine` instance.
     """
     return create_async_engine(
         dsn,
-        pool_size=pool_min,
-        max_overflow=pool_max - pool_min,
+        pool_size=pool_size,
+        max_overflow=max_overflow,
         pool_pre_ping=True,
+        pool_recycle=pool_recycle,
+        pool_timeout=pool_timeout,
         echo=False,
     )
 

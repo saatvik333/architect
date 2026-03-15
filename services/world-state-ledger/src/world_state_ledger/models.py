@@ -117,7 +117,19 @@ class BudgetState(ArchitectBase):
 
 
 class WorldState(MutableBase):
-    """Full world state snapshot — the single source of truth."""
+    """Full world state snapshot — the single source of truth.
+
+    ``WorldState`` intentionally extends ``MutableBase`` (not the frozen
+    ``ArchitectBase``) because it serves as the mutable accumulator for
+    version/timestamp bookkeeping.  All sub-state fields (``SpecState``,
+    ``RepoState``, etc.) remain frozen ``ArchitectBase`` instances.
+
+    Mutations are never applied directly to model fields.  Instead,
+    ``StateManager._apply_mutations`` serialises the state to a dict via
+    ``model_dump``, applies dot-path changes, and reconstructs the model
+    with ``model_validate`` — effectively performing copy-on-write at the
+    serialisation boundary.
+    """
 
     version: LedgerVersion = LedgerVersion(0)
     updated_at: datetime = Field(default_factory=utcnow)

@@ -21,6 +21,7 @@ class TestGetCurrentState:
         state = WorldState(version=5)
         raw = json.dumps(state.model_dump(mode="json"), default=str).encode()
         state_cache._redis.get = AsyncMock(return_value=raw)
+        state_cache._redis.ttl = AsyncMock(return_value=200)
 
         result = await state_cache.get_current_state()
         assert result is not None

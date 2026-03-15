@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import TYPE_CHECKING, Any
 
 from architect_common.enums import AgentType, ModelTier, TaskType
@@ -171,7 +172,16 @@ class TaskDecomposer:
         )
 
         response = await self._llm_client.generate(request)
-        raw_tasks: list[dict[str, Any]] = json.loads(response.content)
+
+        # Strip markdown code fences that LLMs sometimes add despite instructions.
+        content = response.content.strip()
+        content = re.sub(r"^```(?:json)?\s*\n?", "", content.strip())
+        content = re.sub(r"\n?```\s*$", "", content.strip())
+
+        try:
+            raw_tasks: list[dict[str, Any]] = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"LLM returned invalid JSON for task decomposition: {exc}") from exc
 
         # Map task names to IDs for dependency resolution.
         name_to_id: dict[str, str] = {}

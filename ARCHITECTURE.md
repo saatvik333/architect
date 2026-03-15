@@ -78,7 +78,7 @@ flowchart TD
 
 **Communication:** Publishes events via Redis Streams (`proposal.created`, `proposal.accepted`, `proposal.rejected`, `ledger.updated`). All other components read state through the Ledger's API or Temporal activities.
 
-**Implementation:** `services/world-state-ledger/` -- `state_manager.py` (340 lines), `event_log.py`, `cache.py`, `models.py`, FastAPI routes, Temporal activities and worker.
+**Implementation:** `services/world-state-ledger/` -- `state_manager.py`, `event_log.py`, `cache.py`, `models.py`, FastAPI routes, Temporal activities and worker.
 
 ---
 
@@ -111,7 +111,7 @@ flowchart TD
 
 **Communication:** Exposes a FastAPI HTTP API. Called by the Coding Agent (via `SandboxClient`) and the Evaluation Engine. Publishes sandbox lifecycle events.
 
-**Implementation:** `services/execution-sandbox/` -- `docker_executor.py` (328 lines), `security.py`, `resource_limits.py`, `file_manager.py`, `models.py`.
+**Implementation:** `services/execution-sandbox/` -- `docker_executor.py`, `security.py`, `resource_limits.py`, `file_manager.py`, `models.py`.
 
 ---
 
@@ -153,7 +153,7 @@ flowchart TD
 
 **Communication:** Calls the Execution Sandbox via `SandboxClient`. Uses `LLMClient` for Claude API calls. Publishes `agent.completed` events. Orchestrated by Temporal workflows.
 
-**Implementation:** `services/coding-agent/` -- `agent.py` (220 lines), `coder.py`, `planner.py`, `context_builder.py`, `models.py`, Temporal workflows and activities.
+**Implementation:** `services/coding-agent/` -- `agent.py`, `coder.py`, `planner.py`, `context_builder.py`, `models.py`, Temporal workflows and activities.
 
 ---
 
@@ -204,7 +204,13 @@ flowchart TD
 
 **Communication:** Stateless service. No events published. Agents call the REST API to index directories and retrieve context.
 
-**Implementation:** `services/codebase-comprehension/` -- `ast_indexer.py`, `call_graph.py`, `convention_extractor.py`, `context_assembler.py`, `index_store.py`, `models.py`, FastAPI routes (`POST /api/v1/index`, `GET /api/v1/context`, `GET /api/v1/symbols`). Port 8012.
+**Subcomponents:**
+
+- **tree-sitter AST indexer** (`TreeSitterIndexer`) -- Multi-language AST parsing (Python, JavaScript, TypeScript) using tree-sitter grammars. Supplements the built-in Python `ast` module indexer for broader language coverage.
+- **sentence-transformers embedding generator** (`EmbeddingGenerator`) -- Produces 384-dimensional vector embeddings from code chunks using the `all-MiniLM-L6-v2` model via sentence-transformers. Falls back gracefully if sentence-transformers is not installed.
+- **pgvector-based vector store** (`VectorStore`) -- Async PostgreSQL + pgvector store for code embeddings. Supports `store_embeddings`, `search` (cosine distance via `<=>` operator), `delete_index`, and `has_embeddings`. Stored in the `code_embeddings` table with columns for root path, file path, symbol info, embedding (Vector(384)), source chunk, and JSONB metadata.
+
+**Implementation:** `services/codebase-comprehension/` -- `ast_indexer.py`, `call_graph.py`, `convention_extractor.py`, `context_assembler.py`, `index_store.py`, `embeddings.py`, `vector_store.py`, `models.py`, FastAPI routes (`POST /api/v1/index`, `GET /api/v1/context`, `GET /api/v1/symbols`, `POST /api/v1/index/embed`, `GET /api/v1/context/semantic`). Port 8012.
 
 ---
 

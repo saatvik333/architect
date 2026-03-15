@@ -81,7 +81,7 @@ class CodingAgentLoop:
         try:
             # Step 1: Plan
             plan = await self._planner.plan(run.spec_context, run.codebase_context)
-            total_tokens += self._llm.total_usage.total_tokens
+            total_tokens = self._llm.total_usage.total_tokens
 
             # Step 2: Generate initial code
             files = await self._coder.generate(

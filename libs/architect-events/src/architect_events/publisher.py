@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import logging
-
 import redis.asyncio as aioredis
 
+from architect_common.logging import get_logger
 from architect_events.schemas import EventEnvelope
 from architect_events.serialization import serialize_event
 
-logger = logging.getLogger(__name__)
+logger = get_logger(component="architect_events.publisher")
 
 
 class EventPublisher:
@@ -30,7 +29,7 @@ class EventPublisher:
             self._redis_url,
             decode_responses=False,
         )
-        logger.info("EventPublisher connected to %s", self._redis_url)
+        logger.info("EventPublisher connected", redis_url=self._redis_url)
 
     def _stream_name(self, event: EventEnvelope) -> str:
         return f"{self._stream_prefix}:{event.type}"
@@ -47,9 +46,14 @@ class EventPublisher:
         stream = self._stream_name(event)
         fields = serialize_event(event)
 
-        message_id: bytes = await self._redis.xadd(stream, fields)  # type: ignore[arg-type]
+        message_id: bytes = await self._redis.xadd(
+            stream,
+            fields,  # type: ignore[arg-type]
+            maxlen=10_000,
+            approximate=True,
+        )
         mid = message_id.decode() if isinstance(message_id, bytes) else str(message_id)
-        logger.debug("Published %s to %s (mid=%s)", event.type, stream, mid)
+        logger.debug("Published event", event_type=event.type, stream=stream, mid=mid)
         return mid
 
     async def close(self) -> None:

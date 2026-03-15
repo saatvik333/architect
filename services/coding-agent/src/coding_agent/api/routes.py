@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,7 +22,8 @@ from coding_agent.models import (
 router = APIRouter()
 
 # ── In-memory run store (production would use a database) ─────────────
-_run_store: dict[str, dict[str, Any]] = {}
+_MAX_RUN_STORE_SIZE = 1000
+_run_store: OrderedDict[str, dict[str, Any]] = OrderedDict()
 
 
 # ── Request / Response schemas ────────────────────────────────────────
@@ -95,6 +97,13 @@ async def execute_agent(
     output = await agent_loop.execute(run)
 
     output_dict = output.model_dump(mode="json")
+
+    # Prune oldest half when the store exceeds the max size
+    if len(_run_store) >= _MAX_RUN_STORE_SIZE:
+        to_remove = _MAX_RUN_STORE_SIZE // 2
+        for _ in range(to_remove):
+            _run_store.popitem(last=False)
+
     _run_store[str(agent_id)] = {
         "agent_id": str(agent_id),
         "task_id": body.task_id,

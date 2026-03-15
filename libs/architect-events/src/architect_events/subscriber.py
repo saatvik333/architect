@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
 import redis.asyncio as aioredis
 
 from architect_common.enums import EventType
+from architect_common.logging import get_logger
 from architect_events.schemas import EventEnvelope
 from architect_events.serialization import deserialize_event
 
-logger = logging.getLogger(__name__)
+logger = get_logger(component="architect_events.subscriber")
 
 type EventHandler = Callable[[EventEnvelope], Awaitable[None]]
 
@@ -50,6 +50,7 @@ class EventSubscriber:
         self._running = False
         self._task: asyncio.Task[None] | None = None
         self._retry_counts: dict[str, int] = {}
+        self._MAX_RETRY_TRACKING = 10_000
 
     # ── Handler registration ────────────────────────────────────────
     def on(self, event_type: EventType, handler: EventHandler) -> None:
@@ -80,7 +81,7 @@ class EventSubscriber:
                     id="0",
                     mkstream=True,
                 )
-                logger.info("Created consumer group %s on %s", self._group, stream)
+                logger.info("Created consumer group", group=self._group, stream=stream)
             except aioredis.ResponseError as exc:
                 # Group already exists -- that's fine.
                 if "BUSYGROUP" not in str(exc):
@@ -89,10 +90,10 @@ class EventSubscriber:
         self._running = True
         self._task = asyncio.create_task(self._read_loop(event_types))
         logger.info(
-            "EventSubscriber started (group=%s, consumer=%s, streams=%s)",
-            self._group,
-            self._consumer,
-            [et.value for et in event_types],
+            "EventSubscriber started",
+            group=self._group,
+            consumer=self._consumer,
+            streams=[et.value for et in event_types],
         )
 
     async def stop(self) -> None:
@@ -106,7 +107,7 @@ class EventSubscriber:
         if self._redis is not None:
             await self._redis.aclose()
             self._redis = None
-        logger.info("EventSubscriber stopped")
+        logger.info("EventSubscriber stopped", group=self._group, consumer=self._consumer)
 
     # ── DLQ helpers ──────────────────────────────────────────────────
 
@@ -122,7 +123,8 @@ class EventSubscriber:
         error: str,
     ) -> None:
         """Move a failed message to the dead-letter queue."""
-        assert self._redis is not None
+        if self._redis is None:
+            raise RuntimeError("Not connected. Call start() first.")
         dlq_stream = self._dlq_stream_name(event_type)
         mid_str = message_id.decode() if isinstance(message_id, bytes) else message_id
         dlq_fields: dict[str | bytes, str | bytes] = {
@@ -140,10 +142,10 @@ class EventSubscriber:
         # ACK the original so it doesn't stay in PEL
         await self._redis.xack(stream_name, self._group, message_id)
         logger.warning(
-            "Moved message %s to DLQ %s after %d retries",
-            mid_str,
-            dlq_stream,
-            self._max_retries,
+            "Moved message to DLQ",
+            message_id=mid_str,
+            dlq_stream=dlq_stream,
+            retries=self._max_retries,
         )
 
     async def claim_stale_messages(
@@ -180,7 +182,7 @@ class EventSubscriber:
                     break
                 start_id = next_str
 
-        logger.info("Claimed %d stale messages", total_claimed)
+        logger.info("Claimed stale messages", total_claimed=total_claimed)
         return total_claimed
 
     async def get_dlq_messages(
@@ -216,7 +218,8 @@ class EventSubscriber:
 
     async def _read_loop(self, event_types: list[EventType]) -> None:
         """Continuously read from Redis Streams via XREADGROUP."""
-        assert self._redis is not None
+        if self._redis is None:
+            raise RuntimeError("Not connected. Call start() first.")
 
         streams: dict[str, str] = {self._stream_name(et): ">" for et in event_types}
 
@@ -250,7 +253,7 @@ class EventSubscriber:
                 try:
                     event_type = EventType(event_type_str)
                 except ValueError:
-                    logger.warning("Unknown event type in stream %s", stream_name)
+                    logger.warning("Unknown event type in stream", stream=stream_name)
                     continue
 
                 handlers = self._handlers.get(event_type, [])
@@ -263,9 +266,9 @@ class EventSubscriber:
                         envelope = deserialize_event(data)
                     except Exception:
                         logger.exception(
-                            "Failed to deserialize message %s from %s",
-                            message_id,
-                            stream_name,
+                            "Failed to deserialize message",
+                            message_id=message_id,
+                            stream=stream_name,
                         )
                         # Deserialization failures go straight to DLQ
                         await self._move_to_dlq(
@@ -280,9 +283,9 @@ class EventSubscriber:
                             await handler(envelope)
                         except Exception as exc:
                             logger.exception(
-                                "Handler %s failed for message %s",
-                                handler.__name__,
-                                message_id,
+                                "Handler failed for message",
+                                handler_name=handler.__name__,
+                                message_id=message_id,
                             )
                             handler_failed = True
                             last_error = f"{handler.__name__}: {exc}"
@@ -291,6 +294,12 @@ class EventSubscriber:
                     if handler_failed:
                         retry_count = self._retry_counts.get(mid_str, 0) + 1
                         self._retry_counts[mid_str] = retry_count
+
+                        # Prune oldest half of retry tracking if it grows too large
+                        if len(self._retry_counts) > self._MAX_RETRY_TRACKING:
+                            keys = list(self._retry_counts.keys())
+                            for k in keys[: len(keys) // 2]:
+                                del self._retry_counts[k]
 
                         if retry_count >= self._max_retries:
                             await self._move_to_dlq(

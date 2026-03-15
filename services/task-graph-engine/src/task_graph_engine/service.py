@@ -56,9 +56,6 @@ def create_app(config: TaskGraphEngineConfig | None = None) -> FastAPI:
     return app
 
 
-app = create_app()
-
-
 def main() -> None:
     """Run the service with Uvicorn."""
     config = TaskGraphEngineConfig()

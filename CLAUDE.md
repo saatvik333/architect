@@ -32,14 +32,22 @@ A multi-agent system that replaces the software engineering loop: specify → bu
 
 ## Commands
 - `make install` — install all packages
+- `make install-hooks` — install pre-commit and pre-push git hooks
 - `make lint` — ruff check + format check
 - `make format` — auto-format
+- `make format-check` — check formatting without modifying files
 - `make typecheck` — mypy strict mode
 - `make test` — unit tests
 - `make test-integration` — integration tests (requires infra)
+- `make test-e2e` — end-to-end tests (requires infra)
+- `make test-all` — run all tests (unit + integration + E2E)
 - `make infra-up` / `make infra-down` — docker compose
 - `make dev` — full local environment (infra-up + migrate)
 - `make migrate` — run Alembic database migrations
+- `make clean` — remove `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `*.egg-info`
+- `make run-services` — start all backend services (Phase 1 + Phase 2)
+- `make run-gateway` — start the API gateway on port 8000
+- `make run-dashboard` — start the dashboard dev server on port 3000
 - `make run-all` — start everything (infra + services + gateway + dashboard)
 - `make stop-all` — stop all services and infrastructure
 - `make promptfoo-test` — run LLM prompt regression tests (requires ANTHROPIC_API_KEY)

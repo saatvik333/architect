@@ -29,7 +29,11 @@ class EventLog:
 
     # ── Write ────────────────────────────────────────────────────────
 
-    async def append(self, entry: dict[str, Any]) -> EventId:
+    async def append(
+        self,
+        entry: dict[str, Any],
+        session: AsyncSession | None = None,
+    ) -> EventId:
         """Insert an event into the log.
 
         If an ``idempotency_key`` is present and already exists, the insert is
@@ -39,6 +43,11 @@ class EventLog:
         Args:
             entry: A dict with keys matching :class:`EventLogRow` columns.
                    At minimum ``type`` and ``payload`` should be provided.
+            session: An optional externally-managed :class:`AsyncSession`.
+                     When provided the caller is responsible for committing the
+                     transaction; the append will simply execute within the
+                     given session.  When ``None`` (the default), a new session
+                     is created and committed automatically.
 
         Returns:
             The ``EventId`` of the (possibly pre-existing) event row.
@@ -46,31 +55,47 @@ class EventLog:
         event_id = entry.get("id") or new_event_id()
         idempotency_key = entry.get("idempotency_key")
 
-        async with self._session_factory() as session:
-            # Fast-path: check idempotency_key before inserting.
-            if idempotency_key:
-                existing = await self._find_by_idempotency_key(session, idempotency_key)
-                if existing is not None:
-                    logger.debug("idempotent skip", idempotency_key=idempotency_key)
-                    return EventId(existing.id)
+        if session is not None:
+            return await self._do_append(session, event_id, entry, idempotency_key, commit=False)
 
-            row_data = {
-                "id": str(event_id),
-                "type": entry.get("type", "unknown"),
-                "timestamp": entry.get("timestamp", utcnow()),
-                "ledger_version": entry.get("ledger_version"),
-                "proposal_id": entry.get("proposal_id"),
-                "task_id": entry.get("task_id"),
-                "agent_id": entry.get("agent_id"),
-                "payload": entry.get("payload"),
-                "source": entry.get("source", "world-state-ledger"),
-                "idempotency_key": idempotency_key,
-            }
+        async with self._session_factory() as new_session:
+            return await self._do_append(new_session, event_id, entry, idempotency_key, commit=True)
 
-            stmt = pg_insert(EventLogRow).values(**row_data)
-            if idempotency_key:
-                stmt = stmt.on_conflict_do_nothing(index_elements=["idempotency_key"])
-            await session.execute(stmt)
+    async def _do_append(
+        self,
+        session: AsyncSession,
+        event_id: EventId | str,
+        entry: dict[str, Any],
+        idempotency_key: str | None,
+        *,
+        commit: bool,
+    ) -> EventId:
+        """Internal helper that performs the actual insert."""
+        # Fast-path: check idempotency_key before inserting.
+        if idempotency_key:
+            existing = await self._find_by_idempotency_key(session, idempotency_key)
+            if existing is not None:
+                logger.debug("idempotent skip", idempotency_key=idempotency_key)
+                return EventId(existing.id)
+
+        row_data = {
+            "id": str(event_id),
+            "type": entry.get("type", "unknown"),
+            "timestamp": entry.get("timestamp", utcnow()),
+            "ledger_version": entry.get("ledger_version"),
+            "proposal_id": entry.get("proposal_id"),
+            "task_id": entry.get("task_id"),
+            "agent_id": entry.get("agent_id"),
+            "payload": entry.get("payload"),
+            "source": entry.get("source", "world-state-ledger"),
+            "idempotency_key": idempotency_key,
+        }
+
+        stmt = pg_insert(EventLogRow).values(**row_data)
+        if idempotency_key:
+            stmt = stmt.on_conflict_do_nothing(index_elements=["idempotency_key"])
+        await session.execute(stmt)
+        if commit:
             await session.commit()
 
         logger.info("event appended", event_id=str(event_id), event_type=row_data["type"])

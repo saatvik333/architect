@@ -30,4 +30,6 @@ class GatewayConfig(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
 
     # Rate limiting
+    # TODO: rate_limit_per_minute is defined but not yet wired to middleware.
+    # Integrate with a rate-limiting middleware (e.g. slowapi) to enforce this.
     rate_limit_per_minute: int = 60

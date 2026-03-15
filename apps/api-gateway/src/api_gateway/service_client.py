@@ -23,6 +23,16 @@ _SERVICE_URL_MAP = {
     "comm-bus": "agent_comm_bus_url",
 }
 
+# Per-service read timeouts (seconds) for long-running operations.
+_SERVICE_TIMEOUTS: dict[str, float] = {
+    "spec-engine": 180.0,
+    "coding-agent": 180.0,
+    "eval-engine": 120.0,
+    "router": 120.0,
+}
+
+_DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
+
 
 class ServiceClient:
     """HTTP client for proxying to backend ARCHITECT services."""
@@ -33,7 +43,7 @@ class ServiceClient:
 
     async def startup(self) -> None:
         """Create the shared httpx async client."""
-        self._client = httpx.AsyncClient(timeout=30.0)
+        self._client = httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT)
 
     async def shutdown(self) -> None:
         """Close the shared httpx async client."""
@@ -47,6 +57,16 @@ class ServiceClient:
             msg = f"Unknown service: {service}"
             raise ValueError(msg)
         return str(getattr(self._config, attr))
+
+    def _timeout_for_service(self, service: str) -> httpx.Timeout:
+        """Return a timeout with the read value overridden per service."""
+        read = _SERVICE_TIMEOUTS.get(service, _DEFAULT_TIMEOUT.read)
+        return httpx.Timeout(
+            connect=_DEFAULT_TIMEOUT.connect,
+            read=read,
+            write=_DEFAULT_TIMEOUT.write,
+            pool=_DEFAULT_TIMEOUT.pool,
+        )
 
     async def _request(
         self,
@@ -64,7 +84,8 @@ class ServiceClient:
             raise RuntimeError(msg)
 
         url = f"{self._base_url(service)}{path}"
-        resp = await self._client.request(method, url, **kwargs)
+        timeout = self._timeout_for_service(service)
+        resp = await self._client.request(method, url, timeout=timeout, **kwargs)
         resp.raise_for_status()
         return resp.json()  # type: ignore[no-any-return]
 

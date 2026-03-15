@@ -22,11 +22,11 @@ python scripts/check-health.py --timeout 10 --wait 60
 
 ```bash
 # Phase 1 services
-curl http://localhost:8001/health  # Task Graph Engine
-curl http://localhost:8002/health  # World State Ledger
-curl http://localhost:8003/health  # Execution Sandbox
-curl http://localhost:8004/health  # Evaluation Engine
-curl http://localhost:8005/health  # Coding Agent
+curl http://localhost:8001/health  # World State Ledger
+curl http://localhost:8003/health  # Task Graph Engine
+curl http://localhost:8007/health  # Execution Sandbox
+curl http://localhost:8008/health  # Evaluation Engine
+curl http://localhost:8009/health  # Coding Agent
 
 # Phase 2 services
 curl http://localhost:8010/health  # Spec Engine

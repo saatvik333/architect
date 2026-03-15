@@ -536,7 +536,7 @@ All infrastructure is defined in `infra/docker-compose.yml`:
 
 | Service      | Image                        | Port  | Purpose                           |
 |--------------|------------------------------|-------|-----------------------------------|
-| Postgres 16  | `postgres:16`                | 5432  | Primary data store                |
+| Postgres 16  | `pgvector/pgvector:pg16`     | 5432  | Primary data store (with pgvector)|
 | Redis 7      | `redis:7`                    | 6379  | Cache and event streams           |
 | Temporal     | `temporalio/auto-setup`      | 7233  | Workflow orchestration            |
 | Temporal UI  | `temporalio/ui`              | 8080  | Workflow monitoring dashboard     |

@@ -50,6 +50,7 @@ def mock_redis() -> AsyncMock:
     redis.get = AsyncMock(return_value=None)
     redis.set = AsyncMock()
     redis.delete = AsyncMock()
+    redis.ttl = AsyncMock(return_value=200)
     pipe = AsyncMock()
     pipe.set = MagicMock()
     pipe.execute = AsyncMock()

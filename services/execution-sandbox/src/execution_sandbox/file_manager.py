@@ -59,7 +59,7 @@ class FileManager:
             )
             return workspace_path
 
-        return await asyncio.get_event_loop().run_in_executor(None, _write)
+        return await asyncio.to_thread(_write)
 
     async def collect_outputs(self, workspace_path: str, patterns: list[str]) -> dict[str, str]:
         """Read files matching *patterns* from *workspace_path*.
@@ -102,7 +102,7 @@ class FileManager:
             )
             return results
 
-        return await asyncio.get_event_loop().run_in_executor(None, _collect)
+        return await asyncio.to_thread(_collect)
 
     async def cleanup(self, workspace_path: str) -> None:
         """Remove *workspace_path* and all its contents.
@@ -116,4 +116,4 @@ class FileManager:
             shutil.rmtree(workspace_path, ignore_errors=True)
             logger.info("workspace_cleaned", workspace_path=workspace_path)
 
-        await asyncio.get_event_loop().run_in_executor(None, _cleanup)
+        await asyncio.to_thread(_cleanup)

@@ -55,6 +55,19 @@ class TaskDAG:
             )
         self._graph.add_edge(from_task, to_task)
 
+    def update_task(self, task_id: TaskId, updated: Task) -> None:
+        """Replace the stored :class:`Task` for *task_id* with *updated*.
+
+        Raises:
+            TaskNotFoundError: If the task is not in the graph.
+        """
+        if task_id not in self._graph:
+            raise TaskNotFoundError(
+                f"Task {task_id} not found",
+                details={"task_id": task_id},
+            )
+        self._graph.nodes[task_id]["task"] = updated
+
     # ── Queries ────────────────────────────────────────────────────
 
     def get_task(self, task_id: TaskId) -> Task:

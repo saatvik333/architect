@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from typing import Any
 
 import anthropic
@@ -14,12 +13,13 @@ from architect_common.errors import (
     LLMRateLimitError,
     LLMResponseError,
 )
+from architect_common.logging import get_logger
 
-from .cost_tracker import CostTracker
+from .cost_tracker import CostTracker, _resolve_pricing
 from .models import LLMRequest, LLMResponse, TokenUsage
 from .rate_limiter import TokenBucketRateLimiter
 
-logger = logging.getLogger(__name__)
+logger = get_logger(component="architect_llm.client")
 
 
 class LLMClient:
@@ -93,8 +93,6 @@ class LLMClient:
         )
 
         # Rough cost estimate based on prompt length for budget pre-check.
-        from .cost_tracker import _resolve_pricing
-
         input_price, output_price = _resolve_pricing(model_id)
         estimated_input_tokens = sum(len(str(m.get("content", ""))) // 4 for m in request.messages)
         estimated_cost = (estimated_input_tokens * input_price) + (
@@ -126,10 +124,10 @@ class LLMClient:
             except anthropic.RateLimitError as exc:
                 last_exception = exc
                 logger.warning(
-                    "Rate limited (attempt %d/%d): %s",
-                    attempt,
-                    self._max_retries,
-                    exc,
+                    "Rate limited",
+                    attempt=attempt,
+                    max_retries=self._max_retries,
+                    error=str(exc),
                 )
                 if attempt == self._max_retries:
                     raise LLMRateLimitError(
@@ -145,11 +143,11 @@ class LLMClient:
                 # Retry on 5xx server errors.
                 if exc.status_code >= 500 and attempt < self._max_retries:
                     logger.warning(
-                        "Server error %d (attempt %d/%d): %s",
-                        exc.status_code,
-                        attempt,
-                        self._max_retries,
-                        exc,
+                        "Server error",
+                        status_code=exc.status_code,
+                        attempt=attempt,
+                        max_retries=self._max_retries,
+                        error=str(exc),
                     )
                     await asyncio.sleep(2**attempt)
                     self._cost_tracker.check_budget()
@@ -163,10 +161,10 @@ class LLMClient:
                 last_exception = exc
                 if attempt < self._max_retries:
                     logger.warning(
-                        "Connection error (attempt %d/%d): %s",
-                        attempt,
-                        self._max_retries,
-                        exc,
+                        "Connection error",
+                        attempt=attempt,
+                        max_retries=self._max_retries,
+                        error=str(exc),
                     )
                     await asyncio.sleep(2**attempt)
                     self._cost_tracker.check_budget()
@@ -241,3 +239,9 @@ class LLMClient:
     async def close(self) -> None:
         """Close the underlying HTTP client."""
         await self._client.close()
+
+    async def __aenter__(self) -> LLMClient:
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        await self.close()

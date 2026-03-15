@@ -28,6 +28,7 @@ class TestGetCurrent:
         state_cache._redis.get = AsyncMock(
             return_value=sample_world_state.model_dump_json().encode()
         )
+        state_cache._redis.ttl = AsyncMock(return_value=200)
         result = await state_manager.get_current()
         assert result.version == sample_world_state.version
 

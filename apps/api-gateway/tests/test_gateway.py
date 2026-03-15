@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from api_gateway import app
+from api_gateway import app, get_client
 from api_gateway.service_client import ServiceClient
 
 
@@ -21,8 +21,9 @@ def mock_client() -> AsyncMock:
 @pytest.fixture
 def client(mock_client: AsyncMock) -> TestClient:
     """FastAPI TestClient with mocked ServiceClient."""
-    with patch("api_gateway._client", mock_client):
-        yield TestClient(app, raise_server_exceptions=False)
+    app.dependency_overrides[get_client] = lambda: mock_client
+    yield TestClient(app, raise_server_exceptions=False)
+    app.dependency_overrides.clear()
 
 
 # ── Health ───────────────────────────────────────────────────────────

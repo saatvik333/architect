@@ -94,12 +94,17 @@ else
     warn "No migrations directory found; skipping."
 fi
 
-# ── Step 7: Install pre-commit hooks ──────────────────────────────────────────
-info "Setting up pre-commit hooks..."
+# ── Step 7: Install pre-commit and pre-push hooks ────────────────────────────
+info "Setting up Git hooks..."
 if uv run pre-commit install 2>/dev/null; then
     ok "Pre-commit hooks installed."
 else
     warn "Pre-commit setup skipped (pre-commit may not be installed)."
+fi
+if uv run pre-commit install --hook-type pre-push 2>/dev/null; then
+    ok "Pre-push hooks installed."
+else
+    warn "Pre-push hook setup skipped."
 fi
 
 # ── Step 8: Verify setup ──────────────────────────────────────────────────────

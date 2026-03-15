@@ -17,8 +17,10 @@ class PostgresConfig(BaseSettings):
     database: str = "architect"
     user: str = "architect"
     password: SecretStr = SecretStr("architect_dev")
-    pool_min: int = Field(default=2, ge=1)
-    pool_max: int = Field(default=10, ge=1)
+    pool_size: int = Field(default=5, ge=1)
+    max_overflow: int = Field(default=5, ge=0)
+    pool_recycle: int = Field(default=3600, ge=0)
+    pool_timeout: int = Field(default=30, ge=1)
 
     @property
     def dsn(self) -> str:

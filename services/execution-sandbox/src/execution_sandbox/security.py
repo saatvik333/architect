@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 from pathlib import Path
 
 from architect_common.logging import get_logger
@@ -12,7 +13,44 @@ logger = get_logger(component="security")
 # ── Default workspace root used for path validation ──────────────
 WORKSPACE_ROOT = Path("/workspace")
 
-# ── Blocked command patterns ─────────────────────────────────────────
+# -- Allowed binaries (allowlist - primary defense) --
+ALLOWED_BINARIES: frozenset[str] = frozenset(
+    {
+        "python3",
+        "python",
+        "pip",
+        "pip3",
+        "uv",
+        "pytest",
+        "git",
+        "cat",
+        "ls",
+        "mkdir",
+        "cp",
+        "mv",
+        "touch",
+        "echo",
+        "cd",
+        "pwd",
+        "find",
+        "grep",
+        "sed",
+        "awk",
+        "head",
+        "tail",
+        "wc",
+        "sort",
+        "uniq",
+        "diff",
+        "tee",
+        "chmod",
+        "tar",
+        "curl",
+        "wget",
+    }
+)
+
+# ── Blocked command patterns (secondary defense) ─────────────────────
 # Each entry is a tuple of (compiled regex, human-readable reason).
 # All patterns use ``re.IGNORECASE`` so that trivial case-mangling
 # cannot bypass the filter.
@@ -126,6 +164,9 @@ _SUSPICIOUS_FILE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 def validate_command(command: str) -> tuple[bool, str | None]:
     """Check whether *command* is safe to execute in a sandbox.
 
+    Uses an allowlist of permitted binaries as the primary defense,
+    with the regex-based blocklist as a secondary layer.
+
     Returns:
         ``(True, None)`` when the command is allowed, or
         ``(False, reason)`` when the command should be rejected.
@@ -135,6 +176,22 @@ def validate_command(command: str) -> tuple[bool, str | None]:
     if not stripped:
         return False, "empty command"
 
+    # ── Primary defense: binary allowlist ─────────────────────────
+    try:
+        tokens = shlex.split(stripped)
+    except ValueError:
+        return False, "malformed command (unable to parse)"
+
+    if not tokens:
+        return False, "empty command after parsing"
+
+    # Extract the base binary name, stripping any path prefix
+    base_binary = Path(tokens[0]).name
+
+    if base_binary not in ALLOWED_BINARIES:
+        return False, f"binary not in allowlist: {base_binary}"
+
+    # ── Secondary defense: regex blocklist ────────────────────────
     for pattern, reason in BLOCKED_COMMANDS:
         if pattern.search(stripped):
             return False, f"blocked: {reason}"
@@ -161,7 +218,7 @@ def _resolve_sandbox_path(
         except (OSError, ValueError) as exc:
             return False, f"cannot resolve path {raw_path}: {exc}", None
 
-        if not str(resolved).startswith(str(workspace_root)):
+        if not resolved.is_relative_to(workspace_root):
             return False, f"file path escapes workspace: {raw_path}", None
 
         return True, None, resolved
@@ -173,7 +230,7 @@ def _resolve_sandbox_path(
     except (OSError, ValueError) as exc:
         return False, f"cannot resolve path {raw_path}: {exc}", None
 
-    if not str(resolved).startswith(str(workspace_root)):
+    if not resolved.is_relative_to(workspace_root):
         return False, f"path traversal detected: {raw_path}", None
 
     return True, None, resolved
@@ -194,7 +251,7 @@ def _check_symlink_escape(
     try:
         if path.is_symlink():
             target = path.resolve(strict=False)
-            if not str(target).startswith(str(workspace_root)):
+            if not target.is_relative_to(workspace_root):
                 return False, f"symlink escape detected: {raw_path} -> {target}"
     except (OSError, ValueError):
         # If we can't stat the path it doesn't exist yet -- not a symlink risk

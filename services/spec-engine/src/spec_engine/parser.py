@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-import logging
 
+from architect_common.logging import get_logger
 from architect_llm.client import LLMClient
 from architect_llm.models import LLMRequest
 from spec_engine.models import (
@@ -14,7 +14,7 @@ from spec_engine.models import (
     TaskSpec,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(component="spec_engine.parser")
 
 _SYSTEM_PROMPT = """\
 You are a specification engine for the ARCHITECT autonomous coding system.

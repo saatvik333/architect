@@ -6,7 +6,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from coding_agent.temporal.activities import commit_code, update_world_state
+from architect_llm.client import LLMClient
+from architect_sandbox_client.client import SandboxClient
+from coding_agent.config import CodingAgentConfig
+from coding_agent.temporal.activities import CodingAgentActivities
+
+
+def _make_activities() -> CodingAgentActivities:
+    """Create a ``CodingAgentActivities`` instance with mock dependencies."""
+    return CodingAgentActivities(
+        llm_client=MagicMock(spec=LLMClient),
+        sandbox_client=MagicMock(spec=SandboxClient),
+        config=MagicMock(spec=CodingAgentConfig),
+    )
 
 
 class TestCommitCodeActivity:
@@ -14,6 +26,7 @@ class TestCommitCodeActivity:
 
     async def test_commit_code_success(self) -> None:
         """Activity delegates to GitCommitter and returns hash + count."""
+        activities = _make_activities()
         files = [
             {"path": "src/hello.py", "content": "print('hi')"},
             {"path": "tests/test_hello.py", "content": "def test(): pass", "is_test": True},
@@ -26,7 +39,7 @@ class TestCommitCodeActivity:
             "coding_agent.temporal.activities.GitCommitter",
             return_value=mock_committer,
         ):
-            result = await commit_code(files, "feat: add hello", "/repo")
+            result = await activities.commit_code(files, "feat: add hello", "/repo")
 
         assert result["commit_hash"] == "a" * 40
         assert result["files_written"] == 2
@@ -35,6 +48,8 @@ class TestCommitCodeActivity:
     async def test_commit_code_propagates_error(self) -> None:
         """Activity re-raises GitCommitError from the committer."""
         from coding_agent.git import GitCommitError
+
+        activities = _make_activities()
 
         mock_committer = AsyncMock()
         mock_committer.commit.side_effect = GitCommitError("not a repo")
@@ -46,7 +61,7 @@ class TestCommitCodeActivity:
             ),
             pytest.raises(GitCommitError, match="not a repo"),
         ):
-            await commit_code([{"path": "f.py", "content": "x"}], "msg", "/bad")
+            await activities.commit_code([{"path": "f.py", "content": "x"}], "msg", "/bad")
 
 
 class TestUpdateWorldStateActivity:
@@ -54,6 +69,7 @@ class TestUpdateWorldStateActivity:
 
     async def test_update_world_state_success(self) -> None:
         """Activity creates a proposal and commits it successfully."""
+        activities = _make_activities()
         commit_hash = "b" * 40
 
         mock_client = AsyncMock()
@@ -87,7 +103,7 @@ class TestUpdateWorldStateActivity:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch("coding_agent.temporal.activities.httpx.AsyncClient", return_value=mock_client):
-            result = await update_world_state(
+            result = await activities.update_world_state(
                 commit_hash=commit_hash,
                 task_id="task-test000001",
                 agent_id="agent-test00001",
@@ -101,13 +117,15 @@ class TestUpdateWorldStateActivity:
         """Activity returns empty result when WSL is not reachable."""
         import httpx
 
+        activities = _make_activities()
+
         mock_client = AsyncMock()
         mock_client.get.side_effect = httpx.ConnectError("Connection refused")
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch("coding_agent.temporal.activities.httpx.AsyncClient", return_value=mock_client):
-            result = await update_world_state(
+            result = await activities.update_world_state(
                 commit_hash="c" * 40,
                 task_id="task-test000001",
                 agent_id="agent-test00001",
@@ -119,6 +137,8 @@ class TestUpdateWorldStateActivity:
 
     async def test_update_world_state_no_repo_in_state(self) -> None:
         """Activity handles missing repo field in world state gracefully."""
+        activities = _make_activities()
+
         mock_client = AsyncMock()
 
         state_response = MagicMock()
@@ -142,7 +162,7 @@ class TestUpdateWorldStateActivity:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch("coding_agent.temporal.activities.httpx.AsyncClient", return_value=mock_client):
-            result = await update_world_state(
+            result = await activities.update_world_state(
                 commit_hash="d" * 40,
                 task_id="task-test000001",
                 agent_id="agent-test00001",

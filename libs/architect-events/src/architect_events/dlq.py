@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import logging
-
 import redis.asyncio as aioredis
 
 from architect_common.enums import EventType
+from architect_common.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(component="architect_events.dlq")
 
 
 class DeadLetterProcessor:
@@ -40,7 +39,8 @@ class DeadLetterProcessor:
 
     async def count(self, event_type: EventType) -> int:
         """Return the number of messages in the DLQ for *event_type*."""
-        assert self._redis is not None
+        if self._redis is None:
+            raise RuntimeError("Not connected. Call connect() first.")
         return int(await self._redis.xlen(self._dlq_stream(event_type)))
 
     async def reprocess(self, event_type: EventType, count: int = 100) -> int:
@@ -49,7 +49,8 @@ class DeadLetterProcessor:
         Each message is removed from the DLQ after being re-published.
         Returns the number of messages reprocessed.
         """
-        assert self._redis is not None
+        if self._redis is None:
+            raise RuntimeError("Not connected. Call connect() first.")
         dlq = self._dlq_stream(event_type)
         origin = self._origin_stream(event_type)
 
@@ -71,12 +72,13 @@ class DeadLetterProcessor:
             await self._redis.xdel(dlq, mid)
             reprocessed += 1
 
-        logger.info("Reprocessed %d messages from DLQ for %s", reprocessed, event_type)
+        logger.info("Reprocessed messages from DLQ", count=reprocessed, event_type=str(event_type))
         return reprocessed
 
     async def purge(self, event_type: EventType) -> None:
         """Delete the entire DLQ stream for *event_type*."""
-        assert self._redis is not None
+        if self._redis is None:
+            raise RuntimeError("Not connected. Call connect() first.")
         dlq = self._dlq_stream(event_type)
         await self._redis.delete(dlq)
-        logger.info("Purged DLQ stream %s", dlq)
+        logger.info("Purged DLQ stream", dlq_stream=dlq)

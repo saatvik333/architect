@@ -55,12 +55,17 @@ class DockerExecutor(ExecutorBase):
             timestamps=SessionTimestamps(created_at=utcnow()),
         )
 
+        # Add session-level label so orphans can be reconciled
+        config.setdefault("labels", {})
+        config["labels"]["architect.session_id"] = session.id
+        config["labels"]["architect.component"] = "execution-sandbox"
+
         def _create() -> str:
             container = self._client.containers.run(**config)
             return str(container.id)
 
         try:
-            container_id = await asyncio.get_event_loop().run_in_executor(None, _create)
+            container_id = await asyncio.to_thread(_create)
         except docker.errors.ImageNotFound as exc:
             session.status = SandboxStatus.ERROR
             raise SandboxError(
@@ -131,7 +136,7 @@ class DockerExecutor(ExecutorBase):
 
         try:
             exit_code, stdout, stderr = await asyncio.wait_for(
-                asyncio.get_event_loop().run_in_executor(None, _run),
+                asyncio.to_thread(_run),
                 timeout=timeout,
             )
         except TimeoutError as exc:
@@ -168,9 +173,7 @@ class DockerExecutor(ExecutorBase):
 
         # Update resource usage
         try:
-            usage = await asyncio.get_event_loop().run_in_executor(
-                None, check_resource_usage, container
-            )
+            usage = await asyncio.to_thread(check_resource_usage, container)
             session.resource_usage = ResourceUsage(**usage)
         except Exception:
             logger.debug("resource_stats_unavailable", session_id=session_id)
@@ -221,7 +224,7 @@ class DockerExecutor(ExecutorBase):
             buf.seek(0)
             container.put_archive("/workspace", buf)
 
-        await asyncio.get_event_loop().run_in_executor(None, _write)
+        await asyncio.to_thread(_write)
 
         logger.info(
             "files_written",
@@ -256,6 +259,16 @@ class DockerExecutor(ExecutorBase):
                     buf.seek(0)
                     with tarfile.open(fileobj=buf, mode="r") as tar:
                         for member in tar.getmembers():
+                            # Tar slip protection: reject absolute or
+                            # parent-traversal paths
+                            if member.name.startswith("/") or ".." in member.name:
+                                logger.warning(
+                                    "tar_slip_rejected",
+                                    session_id=session_id,
+                                    member_name=member.name,
+                                    path=path,
+                                )
+                                continue
                             if member.isfile():
                                 extracted = tar.extractfile(member)
                                 if extracted is not None:
@@ -273,7 +286,7 @@ class DockerExecutor(ExecutorBase):
                     )
             return results
 
-        return await asyncio.get_event_loop().run_in_executor(None, _read)
+        return await asyncio.to_thread(_read)
 
     async def destroy(self, session_id: str) -> None:
         """Force-remove the container and clean up session state."""
@@ -294,13 +307,61 @@ class DockerExecutor(ExecutorBase):
                         error=str(e),
                     )
 
-            await asyncio.get_event_loop().run_in_executor(None, _destroy)
+            await asyncio.to_thread(_destroy)
 
         session.status = SandboxStatus.DESTROYED
         session.timestamps.destroyed_at = utcnow()
         del self._sessions[session_id]
 
         logger.info("sandbox_destroyed", session_id=session_id)
+
+    # ── Orphan reconciliation ─────────────────────────────────────
+
+    async def _reconcile_orphans(self) -> int:
+        """Remove containers labelled as execution-sandbox that have no
+        matching in-memory session.
+
+        Intended to be called once at startup to clean up containers left
+        behind by a previous crash.
+
+        Returns:
+            The number of orphaned containers removed.
+        """
+
+        def _reconcile() -> int:
+            removed = 0
+            try:
+                containers = self._client.containers.list(
+                    all=True,
+                    filters={"label": "architect.component=execution-sandbox"},
+                )
+            except docker.errors.APIError:
+                logger.error("orphan_reconcile_list_failed")
+                return 0
+
+            known_ids = {s.container_id for s in self._sessions.values() if s.container_id}
+
+            for container in containers:
+                if container.id not in known_ids:
+                    try:
+                        container.remove(force=True)
+                        removed += 1
+                        logger.info(
+                            "orphan_container_removed",
+                            container_id=str(container.id)[:12],
+                        )
+                    except docker.errors.APIError as exc:
+                        logger.warning(
+                            "orphan_remove_failed",
+                            container_id=str(container.id)[:12],
+                            error=str(exc),
+                        )
+            return removed
+
+        count = await asyncio.to_thread(_reconcile)
+        if count:
+            logger.info("orphan_reconciliation_complete", removed=count)
+        return count
 
     # ── Query ────────────────────────────────────────────────────────
 

@@ -33,16 +33,14 @@ def create_app() -> FastAPI:
     return app
 
 
-app = create_app()
-
-
 def main() -> None:
     """CLI entry point: ``python -m multi_model_router.service``."""
     import uvicorn
 
     config = get_config()
     uvicorn.run(
-        "multi_model_router.service:app",
+        "multi_model_router.service:create_app",
+        factory=True,
         host=config.host,
         port=config.port,
         log_level=config.log_level.lower(),

@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # ── Database ─────────────────────────────────────────────────────
     pg = config.architect.postgres
-    engine = create_engine(pg.dsn, pool_min=pg.pool_min, pool_max=pg.pool_max)
+    engine = create_engine(pg.dsn, pool_size=pg.pool_size, max_overflow=pg.max_overflow)
     session_factory = create_session_factory(engine)
 
     # ── Redis ────────────────────────────────────────────────────────
@@ -98,14 +98,15 @@ def create_app(config: WorldStateLedgerConfig | None = None) -> FastAPI:
     return app
 
 
-app = create_app()
-
-
 def main() -> None:
     """CLI entry point — create the app and run it with uvicorn."""
     config = WorldStateLedgerConfig()
-    app = create_app(config)
-    uvicorn.run(app, host=config.host, port=config.port)
+    uvicorn.run(
+        "world_state_ledger.service:create_app",
+        host=config.host,
+        port=config.port,
+        factory=True,
+    )
 
 
 if __name__ == "__main__":

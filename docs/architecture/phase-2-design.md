@@ -22,7 +22,7 @@ Phase 2 expands ARCHITECT from a single-agent system to a multi-agent system wit
 | Agent Comm Bus         | 8013        | (no Temporal — event bus) |
 | Dashboard              | 3000 (dev)  | (React SPA — no backend)  |
 
-Additionally, Phase 2 adds 5 new evaluation layers (L3--L7) to the existing Evaluation Engine on port 8004.
+Additionally, Phase 2 adds 5 new evaluation layers (L3--L7) to the existing Evaluation Engine on port 8008.
 
 ---
 
@@ -470,7 +470,7 @@ flowchart TD
 
 ## Testing Strategy
 
-Phase 2 adds 128 new tests (374 → 502 total):
+Phase 2 adds tests across all new components:
 
 | Component | Tests | Strategy |
 |-----------|-------|----------|

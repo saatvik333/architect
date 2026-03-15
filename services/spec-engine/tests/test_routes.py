@@ -12,7 +12,9 @@ from architect_llm.client import LLMClient
 from architect_llm.models import LLMResponse
 from spec_engine.api.dependencies import get_spec_parser
 from spec_engine.parser import SpecParser
-from spec_engine.service import app
+from spec_engine.service import create_app
+
+app = create_app()
 
 
 def _build_mock_parser() -> SpecParser:

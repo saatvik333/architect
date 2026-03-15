@@ -13,27 +13,27 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function fetchTasks(): Promise<TaskStatus[]> {
-  return request<TaskStatus[]>('/api/v1/tasks');
+export async function fetchTasks(signal?: AbortSignal): Promise<TaskStatus[]> {
+  return request<TaskStatus[]>('/api/v1/tasks', { signal });
 }
 
-export async function fetchTask(taskId: string): Promise<TaskStatus> {
-  return request<TaskStatus>(`/api/v1/tasks/${taskId}`);
+export async function fetchTask(taskId: string, signal?: AbortSignal): Promise<TaskStatus> {
+  return request<TaskStatus>(`/api/v1/tasks/${taskId}`, { signal });
 }
 
-export async function fetchTaskLogs(taskId: string): Promise<TaskLogs> {
-  return request<TaskLogs>(`/api/v1/tasks/${taskId}/logs`);
+export async function fetchTaskLogs(taskId: string, signal?: AbortSignal): Promise<TaskLogs> {
+  return request<TaskLogs>(`/api/v1/tasks/${taskId}/logs`, { signal });
 }
 
-export async function fetchHealth(): Promise<HealthStatus> {
-  return request<HealthStatus>('/api/v1/health');
+export async function fetchHealth(signal?: AbortSignal): Promise<HealthStatus> {
+  return request<HealthStatus>('/api/v1/health', { signal });
 }
 
-export async function fetchProposals(taskId?: string): Promise<Proposal[]> {
+export async function fetchProposals(taskId?: string, signal?: AbortSignal): Promise<Proposal[]> {
   const path = taskId
     ? `/api/v1/proposals?task_id=${encodeURIComponent(taskId)}`
     : '/api/v1/proposals';
-  return request<Proposal[]>(path);
+  return request<Proposal[]>(path, { signal });
 }
 
 export async function cancelTask(taskId: string, force: boolean = false): Promise<void> {

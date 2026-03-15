@@ -31,10 +31,12 @@ The API Gateway (`apps/api-gateway`) is the unified HTTP entry point. All client
 |--------|------|-------------|
 | `GET` | `/health` | Aggregate health check across all services |
 | `POST` | `/api/v1/tasks` | Submit a new task specification |
+| `GET` | `/api/v1/tasks` | List all tasks (optional `status` and `type` query filters) |
 | `GET` | `/api/v1/tasks/{task_id}` | Retrieve task status |
 | `GET` | `/api/v1/tasks/{task_id}/logs` | Retrieve task logs |
 | `POST` | `/api/v1/tasks/{task_id}/cancel` | Cancel a running task |
 | `GET` | `/api/v1/tasks/{task_id}/proposals` | List proposals for a task |
+| `GET` | `/api/v1/proposals` | List proposals (optional `task_id` query filter) |
 | `GET` | `/api/v1/proposals/{proposal_id}` | Get a single proposal |
 | `GET` | `/api/v1/state` | Get current world state |
 | `POST` | `/api/v1/state/proposals` | Submit a raw proposal |
@@ -47,6 +49,7 @@ The API Gateway (`apps/api-gateway`) is the unified HTTP entry point. All client
 | `GET` | `/api/v1/context` | Get relevant code context for a task |
 | `GET` | `/api/v1/symbols` | Search for code symbols |
 | `GET` | `/api/v1/bus/stats` | Get message bus statistics |
+| `GET` | `/api/v1/search` | Semantic code search (proxied to Codebase Comprehension) |
 | `POST` | `/api/v1/bus/publish` | Publish a message to the agent bus |
 
 Configuration is via environment variables with `ARCHITECT_GATEWAY_` prefix (e.g., `ARCHITECT_GATEWAY_TASK_GRAPH_URL`).

@@ -2,17 +2,31 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
+
 from codebase_comprehension.models import CodebaseIndex, SymbolInfo
+
+MAX_INDICES = 50
+"""Maximum number of indices kept in memory before evicting the oldest."""
 
 
 class IndexStore:
     """In-memory store for :class:`CodebaseIndex` instances, keyed by root path."""
 
     def __init__(self) -> None:
-        self._indices: dict[str, CodebaseIndex] = {}
+        self._indices: OrderedDict[str, CodebaseIndex] = OrderedDict()
 
     def store(self, index: CodebaseIndex) -> None:
-        """Store *index* keyed by its ``root_path``."""
+        """Store *index* keyed by its ``root_path``.
+
+        If the store already holds :data:`MAX_INDICES` entries, the oldest
+        entry is evicted to make room.
+        """
+        # Move to end if already present (refresh recency)
+        if index.root_path in self._indices:
+            self._indices.move_to_end(index.root_path)
+        elif len(self._indices) >= MAX_INDICES:
+            self._indices.popitem(last=False)
         self._indices[index.root_path] = index
 
     def get(self, root_path: str) -> CodebaseIndex | None:

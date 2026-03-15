@@ -121,9 +121,30 @@ make migrate
 # Run tests
 make test
 
-# Start a service (example)
-uv run python -m world_state_ledger.service
+# Start the full system (infra + all services + gateway + dashboard)
+make run-all
+
+# Stop everything
+make stop-all
 ```
+
+### Running the Full System
+
+The fastest way to get ARCHITECT running end-to-end:
+
+```bash
+make install       # Install all workspace packages
+make run-all       # Start infra, run migrations, launch all services + gateway + dashboard
+```
+
+This starts:
+
+- **Dashboard** at <http://localhost:3000>
+- **API Gateway** at <http://localhost:8000>
+- **Temporal UI** at <http://localhost:8080>
+- All 9 backend services on ports 8001--8013
+
+When finished, shut everything down with `make stop-all`.
 
 ---
 
@@ -211,6 +232,8 @@ architect/
 | `make infra-down`       | Stop infrastructure containers                                            |
 | `make migrate`          | Run Alembic database migrations                                           |
 | `make dev`              | Start infrastructure + run migrations (full local env)                    |
+| `make run-all`          | Start everything (infra + services + gateway + dashboard)                 |
+| `make stop-all`         | Stop all services and infrastructure                                      |
 | `make clean`            | Remove `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`       |
 
 ---
@@ -229,7 +252,7 @@ architect/
 
 ## Testing
 
-- **576 tests** passing across all packages
+- **Full test suite** passing across all packages
 - Unit tests colocated in each library and service package
 - Integration tests in `tests/integration/` -- require running infrastructure (`make infra-up`)
 - E2E tests in `tests/e2e/` -- test the full task submission-to-completion lifecycle

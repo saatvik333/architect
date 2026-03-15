@@ -2,13 +2,55 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
+from architect_common.errors import SandboxSecurityError
+from architect_common.logging import get_logger
 from execution_sandbox.models import SandboxSpec
+
+logger = get_logger(component="resource_limits")
 
 # Path to the seccomp profile mounted on the Docker host
 SECCOMP_PROFILE_PATH = Path("/etc/docker/seccomp/sandbox-profile.json")
+
+# ── Blocked environment variable names ───────────────────────────────
+BLOCKED_ENV_VARS: frozenset[str] = frozenset(
+    {
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+        "PYTHONPATH",
+        "PYTHONSTARTUP",
+        "PATH",
+        "HOME",
+        "SHELL",
+        "PYTHONHOME",
+        "ENV",
+        "BASH_ENV",
+    }
+)
+
+_ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _validate_environment_vars(env_vars: dict[str, str]) -> None:
+    """Validate user-supplied environment variables.
+
+    Raises:
+        SandboxSecurityError: If a variable name is blocked or malformed.
+    """
+    for key in env_vars:
+        if not _ENV_VAR_NAME_RE.match(key):
+            raise SandboxSecurityError(
+                f"Invalid environment variable name: {key!r}",
+                details={"env_var": key},
+            )
+        if key.upper() in BLOCKED_ENV_VARS:
+            raise SandboxSecurityError(
+                f"Blocked environment variable: {key}",
+                details={"env_var": key},
+            )
 
 
 def create_container_config(spec: SandboxSpec) -> dict[str, Any]:
@@ -35,7 +77,9 @@ def create_container_config(spec: SandboxSpec) -> dict[str, Any]:
         "/workspace": f"size={limits.disk_mb}m,mode=1777",
     }
 
-    # Environment variables
+    # Environment variables — validate user-supplied vars before merging
+    _validate_environment_vars(spec.environment_vars)
+
     environment = {
         "SANDBOX_TASK_ID": spec.task_id,
         "SANDBOX_AGENT_ID": spec.agent_id,
@@ -68,6 +112,7 @@ def create_container_config(spec: SandboxSpec) -> dict[str, Any]:
             "architect.task_id": spec.task_id,
             "architect.agent_id": spec.agent_id,
             "architect.component": "execution-sandbox",
+            "architect.session_id": spec.task_id,
         },
         # Keep the container running so we can exec into it
         "command": ["sleep", str(limits.timeout_seconds)],

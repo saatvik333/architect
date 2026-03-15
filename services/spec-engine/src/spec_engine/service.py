@@ -33,16 +33,14 @@ def create_app() -> FastAPI:
     return app
 
 
-app = create_app()
-
-
 def main() -> None:
     """CLI entry point: ``python -m spec_engine.service``."""
     import uvicorn
 
     config = get_config()
     uvicorn.run(
-        "spec_engine.service:app",
+        "spec_engine.service:create_app",
+        factory=True,
         host=config.host,
         port=config.port,
         log_level=config.log_level.lower(),

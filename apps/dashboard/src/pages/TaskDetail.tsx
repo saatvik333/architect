@@ -12,9 +12,18 @@ function TaskDetail() {
   const navigate = useNavigate();
   const [cancelling, setCancelling] = useState(false);
 
-  const taskFetcher = useCallback(() => fetchTask(taskId!), [taskId]);
-  const logsFetcher = useCallback(() => fetchTaskLogs(taskId!), [taskId]);
-  const proposalsFetcher = useCallback(() => fetchProposals(taskId!), [taskId]);
+  const taskFetcher = useCallback(
+    (signal: AbortSignal) => fetchTask(taskId!, signal),
+    [taskId],
+  );
+  const logsFetcher = useCallback(
+    (signal: AbortSignal) => fetchTaskLogs(taskId!, signal),
+    [taskId],
+  );
+  const proposalsFetcher = useCallback(
+    (signal: AbortSignal) => fetchProposals(taskId!, signal),
+    [taskId],
+  );
 
   const { data: task, error: taskError, loading: taskLoading } = usePolling(taskFetcher, 3000);
   const { data: logs } = usePolling(logsFetcher, 3000);

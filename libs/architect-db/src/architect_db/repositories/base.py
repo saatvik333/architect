@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TypeVar
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from architect_db.models.base import Base
 
-ModelT = TypeVar("ModelT", bound=Base)
+_MAX_LIMIT = 1000
 
 
 class BaseRepository[ModelT: Base]:
@@ -54,10 +52,11 @@ class BaseRepository[ModelT: Base]:
         """Return a paginated list of all entities.
 
         Args:
-            limit: Maximum number of rows to return.
+            limit: Maximum number of rows to return (capped at 1000).
             offset: Number of rows to skip.
         """
-        stmt = select(self.model_class).limit(limit).offset(offset)
+        effective_limit = min(limit, _MAX_LIMIT)
+        stmt = select(self.model_class).limit(effective_limit).offset(offset)
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 

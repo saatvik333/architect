@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { fetchProposals } from '../api/client';
 import { usePolling } from '../hooks/usePolling';
 import StatusBadge from '../components/StatusBadge';
 import type { Proposal } from '../api/types';
 
 function Proposals() {
-  const { data: proposals, error, loading } = usePolling(fetchProposals, 5000);
+  const proposalsFetcher = useCallback(
+    (signal: AbortSignal) => fetchProposals(undefined, signal),
+    [],
+  );
+  const { data: proposals, error, loading } = usePolling(proposalsFetcher, 5000);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const toggleExpand = (id: string) => {

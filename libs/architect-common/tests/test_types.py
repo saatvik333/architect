@@ -11,25 +11,25 @@ from architect_common.types import (
 def test_agent_id_has_prefix() -> None:
     aid = new_agent_id()
     assert aid.startswith("agent-")
-    assert len(aid) == 18  # "agent-" (6) + 12 hex chars
+    assert len(aid) == 38  # "agent-" (6) + 32 hex chars
 
 
 def test_task_id_has_prefix() -> None:
     tid = new_task_id()
     assert tid.startswith("task-")
-    assert len(tid) == 17
+    assert len(tid) == 37  # "task-" (5) + 32 hex chars
 
 
 def test_proposal_id_has_prefix() -> None:
     pid = new_proposal_id()
     assert pid.startswith("prop-")
-    assert len(pid) == 17
+    assert len(pid) == 37  # "prop-" (5) + 32 hex chars
 
 
 def test_event_id_has_prefix() -> None:
     eid = new_event_id()
     assert eid.startswith("evt-")
-    assert len(eid) == 16
+    assert len(eid) == 36  # "evt-" (4) + 32 hex chars
 
 
 def test_ids_are_unique() -> None:

@@ -24,7 +24,7 @@ typecheck:
 	uv run mypy libs/ services/ apps/
 
 test:
-	uv run pytest libs/ services/ apps/ -x -q
+	uv run pytest libs/ services/ apps/ -x -q --cov=libs --cov=services --cov=apps --cov-fail-under=60
 
 test-integration:
 	uv run pytest tests/integration/ -m integration -x -q
@@ -66,7 +66,7 @@ PID_DIR := .pids
 
 run-services: $(PID_DIR)
 	@echo "Starting Phase 1 services..."
-	uv run uvicorn world_state_ledger.service:app --host 0.0.0.0 --port 8001 & echo $$! > $(PID_DIR)/world-state.pid
+	uv run uvicorn world_state_ledger.service:create_app --factory --host 0.0.0.0 --port 8001 & echo $$! > $(PID_DIR)/world-state.pid
 	uv run uvicorn task_graph_engine.service:app --host 0.0.0.0 --port 8003 & echo $$! > $(PID_DIR)/task-graph.pid
 	uv run uvicorn execution_sandbox.service:app --host 0.0.0.0 --port 8007 & echo $$! > $(PID_DIR)/sandbox.pid
 	uv run uvicorn evaluation_engine.service:app --host 0.0.0.0 --port 8008 & echo $$! > $(PID_DIR)/eval-engine.pid

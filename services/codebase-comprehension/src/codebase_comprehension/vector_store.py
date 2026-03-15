@@ -56,12 +56,18 @@ class VectorStore:
             self._engine = create_async_engine(self._database_url, echo=False)
         return self._engine
 
+    BATCH_SIZE = 500
+    """Number of rows to insert per batch to avoid oversized queries."""
+
     async def store_embeddings(
         self,
         root_path: str,
         embeddings: list[tuple[CodeChunk, list[float]]],
     ) -> int:
         """Store chunk embeddings in the database.
+
+        Inserts are performed in batches of :attr:`BATCH_SIZE` to avoid
+        oversized single INSERT statements.
 
         Returns the number of rows inserted.
         """
@@ -86,7 +92,9 @@ class VectorStore:
             )
 
         async with AsyncSession(engine) as session:
-            await session.execute(code_embeddings.insert(), rows)
+            for i in range(0, len(rows), self.BATCH_SIZE):
+                batch = rows[i : i + self.BATCH_SIZE]
+                await session.execute(code_embeddings.insert(), batch)
             await session.commit()
 
         return len(rows)

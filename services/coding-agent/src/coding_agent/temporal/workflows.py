@@ -8,13 +8,13 @@ from typing import Any
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from coding_agent.temporal.activities import (
-        commit_code,
-        execute_in_sandbox,
-        generate_code,
-        plan_task,
-        update_world_state,
-    )
+    from coding_agent.temporal.activities import CodingAgentActivities
+
+    plan_task = CodingAgentActivities.plan_task
+    generate_code = CodingAgentActivities.generate_code
+    execute_in_sandbox = CodingAgentActivities.execute_in_sandbox
+    commit_code = CodingAgentActivities.commit_code
+    update_world_state = CodingAgentActivities.update_world_state
 
 
 @workflow.defn

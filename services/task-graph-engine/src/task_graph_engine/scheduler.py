@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 from architect_common.enums import EvalVerdict, EventType, StatusEnum
@@ -46,6 +47,7 @@ class TaskScheduler:
         self._event_publisher = event_publisher
         self._dag = dag or TaskDAG()
         self._completed: set[TaskId] = set()
+        self._schedule_lock = asyncio.Lock()
 
     @property
     def dag(self) -> TaskDAG:
@@ -79,6 +81,26 @@ class TaskScheduler:
         logger.info("Scheduled next task", task_id=task.id, task_type=task.type)
         return task
 
+    async def schedule_and_claim(self, agent_id: AgentId) -> Task | None:
+        """Atomically schedule the next ready task and mark it as running.
+
+        Acquires a lock so that two agents cannot claim the same task
+        concurrently.
+
+        Args:
+            agent_id: The agent that will execute the claimed task.
+
+        Returns:
+            The claimed :class:`Task` (now in RUNNING status), or ``None``
+            if no task is ready.
+        """
+        async with self._schedule_lock:
+            task = await self.schedule_next()
+            if task is None:
+                return None
+            await self.mark_running(task.id, agent_id)
+            return self._dag.get_task(task.id)
+
     # ── Lifecycle transitions ──────────────────────────────────────
 
     async def mark_running(self, task_id: TaskId, agent_id: AgentId) -> None:
@@ -104,7 +126,7 @@ class TaskScheduler:
                 "timestamps": task.timestamps.model_copy(update={"started_at": now}),
             }
         )
-        self._dag._graph.nodes[task_id]["task"] = updated
+        self._dag.update_task(task_id, updated)
 
         await self._task_repo.update_status(task_id, StatusEnum.RUNNING)
         await self._publish_event(
@@ -138,7 +160,7 @@ class TaskScheduler:
                 "timestamps": task.timestamps.model_copy(update={"completed_at": now}),
             }
         )
-        self._dag._graph.nodes[task_id]["task"] = updated
+        self._dag.update_task(task_id, updated)
         self._completed.add(task_id)
 
         await self._task_repo.update_status(task_id, StatusEnum.COMPLETED)
@@ -181,7 +203,7 @@ class TaskScheduler:
                 "retry_history": [*task.retry_history, retry_record],
             }
         )
-        self._dag._graph.nodes[task_id]["task"] = updated
+        self._dag.update_task(task_id, updated)
 
         await self._task_repo.update_status(task_id, StatusEnum.FAILED, error_message=error)
         await self._publish_event(
@@ -233,7 +255,7 @@ class TaskScheduler:
                 ),
             }
         )
-        self._dag._graph.nodes[task_id]["task"] = updated
+        self._dag.update_task(task_id, updated)
 
         await self._task_repo.update_status(task_id, StatusEnum.PENDING)
         await self._publish_event(

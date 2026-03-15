@@ -196,7 +196,7 @@ class TestEvaluationReport:
                 ),
             ],
         )
-        assert report.compute_overall_verdict() == EvalVerdict.PASS
+        assert EvaluationReport.compute_overall_verdict(report.layers) == EvalVerdict.PASS
 
     def test_fail_hard_dominates(self) -> None:
         now = utcnow()
@@ -219,7 +219,7 @@ class TestEvaluationReport:
                 ),
             ],
         )
-        assert report.compute_overall_verdict() == EvalVerdict.FAIL_HARD
+        assert EvaluationReport.compute_overall_verdict(report.layers) == EvalVerdict.FAIL_HARD
 
     def test_fail_soft_when_no_hard(self) -> None:
         now = utcnow()
@@ -242,11 +242,11 @@ class TestEvaluationReport:
                 ),
             ],
         )
-        assert report.compute_overall_verdict() == EvalVerdict.FAIL_SOFT
+        assert EvaluationReport.compute_overall_verdict(report.layers) == EvalVerdict.FAIL_SOFT
 
     def test_empty_layers(self) -> None:
         report = EvaluationReport(
             task_id=TaskId("task-test000001"),
             layers=[],
         )
-        assert report.compute_overall_verdict() == EvalVerdict.PASS
+        assert EvaluationReport.compute_overall_verdict(report.layers) == EvalVerdict.PASS

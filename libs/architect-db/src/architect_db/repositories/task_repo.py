@@ -6,8 +6,17 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 
+from architect_common.enums import StatusEnum
 from architect_db.models.task import Task
 from architect_db.repositories.base import BaseRepository
+
+_TERMINAL_STATUSES = frozenset(
+    {
+        StatusEnum.COMPLETED,
+        StatusEnum.FAILED,
+        StatusEnum.CANCELLED,
+    }
+)
 
 
 class TaskRepository(BaseRepository[Task]):
@@ -17,14 +26,14 @@ class TaskRepository(BaseRepository[Task]):
 
     async def list_by_status(
         self,
-        status: str,
+        status: StatusEnum,
         *,
         limit: int = 100,
     ) -> list[Task]:
         """Return tasks matching the given status.
 
         Args:
-            status: The status string to filter on (e.g. ``"pending"``).
+            status: The :class:`StatusEnum` value to filter on.
             limit: Maximum number of results.
 
         Returns:
@@ -42,7 +51,7 @@ class TaskRepository(BaseRepository[Task]):
     async def update_status(
         self,
         task_id: str,
-        status: str,
+        status: StatusEnum,
         *,
         error_message: str | None = None,
     ) -> None:
@@ -53,7 +62,7 @@ class TaskRepository(BaseRepository[Task]):
 
         Args:
             task_id: The task primary key.
-            status: The new status value.
+            status: The new :class:`StatusEnum` value.
             error_message: Optional error message for failed tasks.
         """
         values: dict[str, object] = {"status": status}
@@ -62,9 +71,9 @@ class TaskRepository(BaseRepository[Task]):
             values["error_message"] = error_message
 
         now = datetime.now(UTC)
-        if status == "running":
+        if status is StatusEnum.RUNNING:
             values["started_at"] = now
-        elif status in {"completed", "failed", "cancelled"}:
+        elif status in _TERMINAL_STATUSES:
             values["completed_at"] = now
 
         stmt = update(Task).where(Task.id == task_id).values(**values)
@@ -83,7 +92,7 @@ class TaskRepository(BaseRepository[Task]):
         """
         stmt = (
             select(Task)
-            .where(Task.status == "pending")
+            .where(Task.status == StatusEnum.PENDING)
             .order_by(Task.priority.desc(), Task.created_at.asc())
             .limit(1)
         )

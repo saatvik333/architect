@@ -118,16 +118,11 @@ class Evaluator:
                 break
 
         # Compute overall verdict from layer results, then build the final report
-        temp = EvaluationReport(
-            task_id=task_id,
-            layers=layer_results,
-            overall_verdict=EvalVerdict.PASS,
-            created_at=report.created_at,
-        )
+        overall = EvaluationReport.compute_overall_verdict(layer_results)
         report = EvaluationReport(
             task_id=task_id,
             layers=layer_results,
-            overall_verdict=temp.compute_overall_verdict(),
+            overall_verdict=overall,
             created_at=report.created_at,
         )
 

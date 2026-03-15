@@ -55,7 +55,6 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}/service:${{ steps.changelog.outputs.version }}
-            ghcr.io/${{ github.repository }}/service:latest
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

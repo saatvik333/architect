@@ -125,17 +125,24 @@ class EvaluationReport(ArchitectBase):
     overall_verdict: EvalVerdict = EvalVerdict.PASS
     created_at: datetime = Field(default_factory=utcnow)
 
-    def compute_overall_verdict(self) -> EvalVerdict:
+    @staticmethod
+    def compute_overall_verdict(layers: list[LayerEvaluation] | None = None) -> EvalVerdict:
         """Derive the overall verdict from individual layer verdicts.
+
+        Args:
+            layers: List of layer evaluations to compute verdict from.
+                If ``None``, returns PASS (no layers means no failures).
 
         Returns:
             FAIL_HARD if any layer returned FAIL_HARD, FAIL_SOFT if any
             layer returned FAIL_SOFT, otherwise PASS.
         """
-        for layer_eval in self.layers:
+        if not layers:
+            return EvalVerdict.PASS
+        for layer_eval in layers:
             if layer_eval.verdict == EvalVerdict.FAIL_HARD:
                 return EvalVerdict.FAIL_HARD
-        for layer_eval in self.layers:
+        for layer_eval in layers:
             if layer_eval.verdict == EvalVerdict.FAIL_SOFT:
                 return EvalVerdict.FAIL_SOFT
         return EvalVerdict.PASS

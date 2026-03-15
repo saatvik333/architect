@@ -36,8 +36,8 @@ def _get_session_factory(config: TaskGraphEngineConfig = Depends(get_config)) ->
     if _session_factory is None:
         engine = create_engine(
             config.postgres.dsn,
-            pool_min=config.postgres.pool_min,
-            pool_max=config.postgres.pool_max,
+            pool_size=config.postgres.pool_size,
+            max_overflow=config.postgres.max_overflow,
         )
         _session_factory = create_session_factory(engine)
     return _session_factory

@@ -7,7 +7,7 @@ interface UsePollingResult<T> {
 }
 
 export function usePolling<T>(
-  fetcher: () => Promise<T>,
+  fetcher: (signal: AbortSignal) => Promise<T>,
   intervalMs: number = 3000,
 ): UsePollingResult<T> {
   const [data, setData] = useState<T | null>(null);
@@ -15,19 +15,34 @@ export function usePolling<T>(
   const [loading, setLoading] = useState<boolean>(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fetcherRef = useRef(fetcher);
+  const controllerRef = useRef<AbortController | null>(null);
 
   // Keep fetcher ref up to date without triggering re-effects
   fetcherRef.current = fetcher;
 
   const doFetch = useCallback(async () => {
+    // Abort any in-flight request before starting a new one
+    if (controllerRef.current) {
+      controllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
     try {
-      const result = await fetcherRef.current();
-      setData(result);
-      setError(null);
+      const result = await fetcherRef.current(controller.signal);
+      if (!controller.signal.aborted) {
+        setData(result);
+        setError(null);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      if (!controller.signal.aborted) {
+        setError(err instanceof Error ? err : new Error(String(err)));
+      }
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -64,6 +79,10 @@ export function usePolling<T>(
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      // Abort any in-flight request on unmount
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+      }
       stopPolling();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };

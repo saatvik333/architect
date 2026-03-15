@@ -11,6 +11,13 @@ with workflow.unsafe.imports_passed_through():
     from temporalio.common import RetryPolicy
 
     from architect_common.enums import EvalVerdict, StatusEnum
+    from task_graph_engine.temporal.activities import (
+        check_budget,
+        decompose_spec,
+        execute_task,
+        schedule_next_task,
+        update_task_status,
+    )
 
 
 TASK_QUEUE = "task-graph-engine"
@@ -43,7 +50,7 @@ class TaskOrchestrationWorkflow:
 
         # Step 1: Decompose the specification into tasks.
         raw_tasks: list[dict[str, Any]] = await workflow.execute_activity(
-            "decompose_spec",
+            decompose_spec,
             args=[spec],
             start_to_close_timeout=timedelta(minutes=5),
         )
@@ -52,6 +59,7 @@ class TaskOrchestrationWorkflow:
         completed: set[str] = set()
         failed: set[str] = set()
         task_results: dict[str, dict[str, Any]] = {}
+        budget_status: dict[str, Any] = {}
 
         # Main orchestration loop.
         max_iterations = len(task_ids) * 4  # Safety bound to prevent infinite loops.
@@ -61,8 +69,8 @@ class TaskOrchestrationWorkflow:
             iteration += 1
 
             # Step 2: Check budget before proceeding.
-            budget_status: dict[str, Any] = await workflow.execute_activity(
-                "check_budget",
+            budget_status = await workflow.execute_activity(
+                check_budget,
                 start_to_close_timeout=timedelta(seconds=30),
             )
             if budget_status.get("exhausted", False):
@@ -71,7 +79,7 @@ class TaskOrchestrationWorkflow:
 
             # Step 3: Get the next ready task.
             next_task: dict[str, Any] | None = await workflow.execute_activity(
-                "schedule_next_task",
+                schedule_next_task,
                 start_to_close_timeout=timedelta(seconds=30),
             )
 
@@ -90,7 +98,7 @@ class TaskOrchestrationWorkflow:
 
             # Step 4: Mark the task as running.
             await workflow.execute_activity(
-                "update_task_status",
+                update_task_status,
                 args=[task_id, StatusEnum.RUNNING.value],
                 start_to_close_timeout=timedelta(seconds=30),
             )
@@ -98,7 +106,7 @@ class TaskOrchestrationWorkflow:
             # Step 5: Execute the task (this is where the agent does its work).
             try:
                 result: dict[str, Any] = await workflow.execute_activity(
-                    "execute_task",
+                    execute_task,
                     args=[next_task],
                     start_to_close_timeout=timedelta(minutes=30),
                     retry_policy=RetryPolicy(
@@ -111,7 +119,7 @@ class TaskOrchestrationWorkflow:
             except Exception as exc:
                 # Task execution failed after all retries.
                 await workflow.execute_activity(
-                    "update_task_status",
+                    update_task_status,
                     args=[task_id, StatusEnum.FAILED.value],
                     start_to_close_timeout=timedelta(seconds=30),
                 )
@@ -128,7 +136,7 @@ class TaskOrchestrationWorkflow:
 
             if verdict == EvalVerdict.PASS.value:
                 await workflow.execute_activity(
-                    "update_task_status",
+                    update_task_status,
                     args=[task_id, StatusEnum.COMPLETED.value],
                     start_to_close_timeout=timedelta(seconds=30),
                 )
@@ -140,7 +148,7 @@ class TaskOrchestrationWorkflow:
             elif verdict == EvalVerdict.FAIL_HARD.value:
                 # Hard failure — no retry.
                 await workflow.execute_activity(
-                    "update_task_status",
+                    update_task_status,
                     args=[task_id, StatusEnum.FAILED.value],
                     start_to_close_timeout=timedelta(seconds=30),
                 )
@@ -152,7 +160,7 @@ class TaskOrchestrationWorkflow:
             else:
                 # Soft failure — will be retried by the retry_policy on the activity.
                 await workflow.execute_activity(
-                    "update_task_status",
+                    update_task_status,
                     args=[task_id, StatusEnum.FAILED.value],
                     start_to_close_timeout=timedelta(seconds=30),
                 )
@@ -170,5 +178,5 @@ class TaskOrchestrationWorkflow:
             "failed": len(failed),
             "all_passed": all_passed,
             "task_results": task_results,
-            "budget_status": budget_status if "budget_status" in dir() else {},
+            "budget_status": budget_status,
         }

@@ -126,7 +126,7 @@ This runs Alembic migrations against the local Postgres instance, creating all r
 ## Step 6: Verify
 
 ```bash
-make test          # 576 tests should pass
+make test          # The full test suite should pass
 make lint          # Should report no issues
 make typecheck     # mypy strict mode should pass
 ```
