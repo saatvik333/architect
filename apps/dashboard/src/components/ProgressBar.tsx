@@ -4,11 +4,12 @@ interface ProgressBarProps {
 
 function ProgressBar({ progress }: ProgressBarProps) {
   const clamped = Math.max(0, Math.min(100, progress));
+  const done = clamped === 100;
 
   return (
-    <div className="w-full bg-gray-700 rounded-full h-2.5 overflow-hidden">
+    <div className="progress-track">
       <div
-        className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-blue-400 transition-all duration-500 ease-out"
+        className={`progress-fill ${done ? 'progress-fill-done' : 'progress-fill-active'}`}
         style={{ width: `${clamped}%` }}
       />
     </div>

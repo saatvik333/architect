@@ -9,6 +9,9 @@ dist/
 build/
 .eggs/
 
+# AI Settings
+.claude/settings.local.json
+
 # Virtual environments
 .venv/
 venv/

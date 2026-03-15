@@ -21,8 +21,8 @@ describe('StatusBadge', () => {
 
   it('renders with badge styling', () => {
     render(<StatusBadge status="running" />);
-    const badge = screen.getByText('running');
-    expect(badge).toHaveClass('rounded-full', 'text-xs', 'font-medium');
+    const badge = screen.getByText('running').closest('.status-badge');
+    expect(badge).toBeInTheDocument();
   });
 
   it('falls back to pending styling for unknown status', () => {
@@ -30,24 +30,33 @@ describe('StatusBadge', () => {
     expect(screen.getByText('unknown')).toBeInTheDocument();
   });
 
-  it('applies correct color classes for completed status', () => {
+  it('applies correct color for completed status', () => {
     render(<StatusBadge status="completed" />);
-    const badge = screen.getByText('completed');
-    expect(badge.className).toContain('bg-green-600/30');
-    expect(badge.className).toContain('text-green-300');
+    const badge = screen.getByText('completed').closest('.status-badge') as HTMLElement;
+    expect(badge.style.color).toBe('rgb(63, 185, 80)');
   });
 
-  it('applies correct color classes for failed status', () => {
+  it('applies correct color for failed status', () => {
     render(<StatusBadge status="failed" />);
-    const badge = screen.getByText('failed');
-    expect(badge.className).toContain('bg-red-600/30');
-    expect(badge.className).toContain('text-red-300');
+    const badge = screen.getByText('failed').closest('.status-badge') as HTMLElement;
+    expect(badge.style.color).toBe('rgb(248, 81, 73)');
   });
 
-  it('applies correct color classes for running status', () => {
+  it('applies correct color for running status', () => {
     render(<StatusBadge status="running" />);
-    const badge = screen.getByText('running');
-    expect(badge.className).toContain('bg-blue-600/30');
-    expect(badge.className).toContain('text-blue-300');
+    const badge = screen.getByText('running').closest('.status-badge') as HTMLElement;
+    expect(badge.style.color).toBe('rgb(88, 166, 255)');
+  });
+
+  it('renders a pulsing dot for running status', () => {
+    const { container } = render(<StatusBadge status="running" />);
+    const dot = container.querySelector('.status-dot-running');
+    expect(dot).toBeInTheDocument();
+  });
+
+  it('does not render a dot for pending status', () => {
+    const { container } = render(<StatusBadge status="pending" />);
+    const dot = container.querySelector('.status-dot');
+    expect(dot).not.toBeInTheDocument();
   });
 });

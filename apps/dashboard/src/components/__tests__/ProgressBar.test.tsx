@@ -33,15 +33,21 @@ describe('ProgressBar', () => {
     expect(bar.style.width).toBe('0%');
   });
 
-  it('renders the outer container with overflow-hidden', () => {
+  it('renders the outer container as the progress track', () => {
     const { container } = render(<ProgressBar progress={50} />);
     const outer = container.firstElementChild as HTMLElement;
-    expect(outer.className).toContain('overflow-hidden');
+    expect(outer.className).toContain('progress-track');
   });
 
-  it('renders the fill bar with gradient classes', () => {
+  it('renders the fill bar with active gradient class for partial progress', () => {
     const { container } = render(<ProgressBar progress={50} />);
     const bar = container.querySelector('[style]') as HTMLElement;
-    expect(bar.className).toContain('bg-gradient-to-r');
+    expect(bar.className).toContain('progress-fill-active');
+  });
+
+  it('renders the fill bar with done gradient class at 100%', () => {
+    const { container } = render(<ProgressBar progress={100} />);
+    const bar = container.querySelector('[style]') as HTMLElement;
+    expect(bar.className).toContain('progress-fill-done');
   });
 });
