@@ -17,9 +17,9 @@ The five active components in Phase 1 are:
 | Component            | Service Port | Temporal Task Queue       |
 |----------------------|-------------|---------------------------|
 | World State Ledger   | 8001        | `world-state-ledger`      |
-| Execution Sandbox    | 8002        | `execution-sandbox`       |
 | Task Graph Engine    | 8003        | `task-graph-engine`       |
-| Evaluation Engine    | 8004        | `evaluation-engine`       |
+| Execution Sandbox    | 8007        | `execution-sandbox`       |
+| Evaluation Engine    | 8008        | `evaluation-engine`       |
 | Coding Agent         | 8009        | `coding-agent`            |
 
 ---

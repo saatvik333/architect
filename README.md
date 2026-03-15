@@ -229,7 +229,7 @@ architect/
 
 ## Testing
 
-- **502 tests** passing across all packages
+- **576 tests** passing across all packages
 - Unit tests colocated in each library and service package
 - Integration tests in `tests/integration/` -- require running infrastructure (`make infra-up`)
 - E2E tests in `tests/e2e/` -- test the full task submission-to-completion lifecycle

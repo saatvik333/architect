@@ -210,7 +210,21 @@ This replaces the need for agents to read the entire codebase — they get a foc
 
 #### Storage
 
-`IndexStore` is an in-memory dict mapping `root_path` → `CodebaseIndex`. Symbol search uses brute-force case-insensitive substring matching across all stored indices. In Phase 3, this will be replaced by a vector database (pgvector or Qdrant) for semantic search.
+`IndexStore` is an in-memory dict mapping `root_path` → `CodebaseIndex`. Symbol search uses brute-force case-insensitive substring matching across all stored indices for keyword-based context retrieval.
+
+#### Semantic Search (pgvector)
+
+In addition to keyword-based search, Codebase Comprehension supports semantic similarity search via PostgreSQL + pgvector:
+
+- **`EmbeddingGenerator`** -- Uses `all-MiniLM-L6-v2` via `sentence-transformers` to produce 384-dimensional embeddings from code chunks. Falls back gracefully if sentence-transformers is not installed
+- **`VectorStore`** -- Async store backed by PostgreSQL + pgvector. Supports `store_embeddings`, `search` (cosine distance via `<=>` operator), `delete_index`, and `has_embeddings`
+- **`code_embeddings` table** -- Defined in `infra/postgres/init.sql` with columns: `id` (UUID), `root_path`, `file_path`, `symbol_name`, `symbol_kind`, `line_number`, `embedding` (Vector(384)), `source_chunk`, `metadata` (JSONB)
+- **`ContextAssembler`** -- Operates in hybrid mode: uses keyword-based search when no embeddings exist, and can incorporate semantic results when embeddings are available
+
+**API endpoints:**
+
+- `POST /api/v1/embeddings/generate` -- Generate and store embeddings for an indexed codebase directory
+- `GET /api/v1/context/semantic` -- Search for code using semantic similarity via pgvector
 
 ---
 

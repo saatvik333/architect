@@ -126,7 +126,7 @@ This runs Alembic migrations against the local Postgres instance, creating all r
 ## Step 6: Verify
 
 ```bash
-make test          # 502 tests should pass
+make test          # 576 tests should pass
 make lint          # Should report no issues
 make typecheck     # mypy strict mode should pass
 ```
@@ -141,11 +141,11 @@ Each ARCHITECT service runs as an independent process. Start them in separate te
 
 ```bash
 # Phase 1 services
-uv run python -m world_state_ledger.service       # Port 8002
-uv run python -m task_graph_engine.service         # Port 8001
-uv run python -m execution_sandbox.service         # Port 8003
-uv run python -m evaluation_engine.service         # Port 8004
-uv run python -m coding_agent.service              # Port 8005
+uv run python -m world_state_ledger.service       # Port 8001
+uv run python -m task_graph_engine.service         # Port 8003
+uv run python -m execution_sandbox.service         # Port 8007
+uv run python -m evaluation_engine.service         # Port 8008
+uv run python -m coding_agent.service              # Port 8009
 
 # Phase 2 services
 uv run python -m spec_engine.service               # Port 8010

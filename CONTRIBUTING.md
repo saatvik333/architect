@@ -47,7 +47,7 @@ The `dev-setup.sh` script handles the full workflow:
 ### Verifying Setup
 
 ```bash
-make test        # 248 tests should pass
+make test        # 576 tests should pass
 make lint        # Should show "All checks passed!"
 make typecheck   # Should pass (mypy strict mode)
 ```
@@ -86,6 +86,37 @@ make typecheck   # Should pass (mypy strict mode)
 - Environment variables with `ARCHITECT_` prefix
 - Nested config via `pydantic-settings`: `ARCHITECT_PG_HOST`, `ARCHITECT_REDIS_PORT`, etc.
 - See `.env.example` for all available settings including Postgres, Redis, Temporal, sandbox, Claude API, and budget configuration
+
+### Port Assignments
+
+This is the authoritative port reference for local development. All other docs cross-reference this table.
+
+**Application services:**
+
+| Port | Service |
+|------|---------|
+| 3000 | Dashboard (dev) |
+| 8000 | API Gateway |
+| 8001 | World State Ledger |
+| 8003 | Task Graph Engine |
+| 8007 | Execution Sandbox |
+| 8008 | Evaluation Engine |
+| 8009 | Coding Agent |
+| 8010 | Spec Engine |
+| 8011 | Multi-Model Router |
+| 8012 | Codebase Comprehension |
+| 8013 | Agent Comm Bus |
+
+**Infrastructure:**
+
+| Port | Service |
+|------|---------|
+| 4222 | NATS (client) |
+| 5432 | PostgreSQL |
+| 6379 | Redis |
+| 7233 | Temporal Server (gRPC) |
+| 8080 | Temporal UI |
+| 8222 | NATS Monitoring |
 
 ---
 

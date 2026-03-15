@@ -11,11 +11,11 @@ Each service binds to a dedicated port on `localhost` during local development:
 | Service              | Port |
 |----------------------|------|
 | **API Gateway**          | 8000 |
-| Task Graph Engine        | 8001 |
-| World State Ledger       | 8002 |
-| Execution Sandbox        | 8003 |
-| Evaluation Engine        | 8004 |
-| Coding Agent             | 8005 |
+| World State Ledger       | 8001 |
+| Task Graph Engine        | 8003 |
+| Execution Sandbox        | 8007 |
+| Evaluation Engine        | 8008 |
+| Coding Agent             | 8009 |
 | Spec Engine              | 8010 |
 | Multi-Model Router       | 8011 |
 | Codebase Comprehension   | 8012 |
@@ -485,7 +485,7 @@ Get the current task graph state including all tasks and the computed execution 
 
 ---
 
-## 3. Execution Sandbox API (Port 8002)
+## 3. Execution Sandbox API (Port 8007)
 
 The Execution Sandbox provides isolated Docker containers for running generated code. Each sandbox session is associated with a task and agent, has strict resource limits, and produces a full audit trail.
 
@@ -657,7 +657,7 @@ Destroy the sandbox container and reclaim all resources. The container is stoppe
 
 ---
 
-## 4. Evaluation Engine API (Port 8004)
+## 4. Evaluation Engine API (Port 8008)
 
 The Evaluation Engine runs a multi-layer evaluation pipeline against code in a sandbox. In Phase 1, the pipeline consists of a Compilation layer and a Unit Test layer. The engine uses a pluggable architecture, so additional layers are added in later phases.
 
@@ -1081,6 +1081,60 @@ If the input is ambiguous, `needs_clarification` is `true` and `spec` is `null`:
 | `limit` | int | 20 | Max results to return |
 
 **Response (200):** Array of `SymbolInfo` objects.
+
+### `POST /api/v1/index/embed` -- Generate Embeddings
+
+Generate vector embeddings for an indexed codebase and store them in pgvector for semantic search.
+
+**Request body:**
+
+```json
+{
+  "directory": "/path/to/project",
+  "database_url": "postgresql+asyncpg://architect:architect_dev@localhost:5432/architect"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "root_path": "/path/to/project",
+  "total_chunks": 156,
+  "total_embeddings": 156
+}
+```
+
+### `GET /api/v1/context/semantic` -- Semantic Search
+
+Search for code using semantic similarity via pgvector embeddings.
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | string | | Natural-language search query |
+| `root_path` | string | (none) | Filter results to a specific codebase |
+| `limit` | int | 20 | Max results to return |
+
+**Response (200):**
+
+```json
+{
+  "results": [
+    {
+      "symbol_name": "OAuthProvider",
+      "symbol_kind": "class",
+      "file_path": "src/auth/oauth.py",
+      "line_number": 15,
+      "source_chunk": "class OAuthProvider:\n    ...",
+      "score": 0.87,
+      "metadata": {}
+    }
+  ],
+  "total": 1
+}
+```
 
 ---
 

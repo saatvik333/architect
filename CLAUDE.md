@@ -38,8 +38,12 @@ A multi-agent system that replaces the software engineering loop: specify → bu
 - `make test` — unit tests
 - `make test-integration` — integration tests (requires infra)
 - `make infra-up` / `make infra-down` — docker compose
-- `make dev` — full local environment
+- `make dev` — full local environment (infra-up + migrate)
+- `make migrate` — run Alembic database migrations
+- `make run-all` — start everything (infra + services + gateway + dashboard)
+- `make stop-all` — stop all services and infrastructure
 - `make promptfoo-test` — run LLM prompt regression tests (requires ANTHROPIC_API_KEY)
+- `make promptfoo-view` — open PromptFoo test results viewer
 
 ## Documentation Maintenance
 After completing any non-trivial change, automatically:
