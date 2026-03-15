@@ -58,9 +58,10 @@ class ImportInfo(ArchitectBase):
 
 
 class FileIndex(ArchitectBase):
-    """Index of all symbols in a single Python file."""
+    """Index of all symbols in a single file."""
 
     path: str
+    language: str = "python"
     functions: list[FunctionDef] = Field(default_factory=list)
     classes: list[ClassDef] = Field(default_factory=list)
     imports: list[ImportInfo] = Field(default_factory=list)
@@ -85,6 +86,38 @@ class CodeContext(ArchitectBase):
     related_symbols: list[SymbolInfo] = Field(default_factory=list)
     related_tests: list[str] = Field(default_factory=list)
     import_graph: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class CodeChunk(ArchitectBase):
+    """A semantic chunk of source code, typically a function/class/method body."""
+
+    file_path: str
+    symbol_name: str
+    symbol_kind: str
+    line_number: int
+    end_line: int
+    source: str
+    context: str = ""
+
+
+class EmbeddingResult(ArchitectBase):
+    """A search result from the vector store with similarity score."""
+
+    symbol_name: str
+    symbol_kind: str
+    file_path: str
+    line_number: int
+    source_chunk: str
+    score: float
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+
+class ArchitectureMap(ArchitectBase):
+    """High-level architecture map of a codebase."""
+
+    modules: dict[str, list[str]] = Field(default_factory=dict)
+    entry_points: list[str] = Field(default_factory=list)
+    layers: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class ConventionReport(ArchitectBase):

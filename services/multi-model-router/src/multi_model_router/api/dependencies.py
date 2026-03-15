@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from multi_model_router.config import MultiModelRouterConfig
+from multi_model_router.cost_collector import CostCollector
 from multi_model_router.escalation import EscalationPolicy
 from multi_model_router.router import Router
 from multi_model_router.scorer import ComplexityScorer
@@ -19,6 +20,7 @@ def get_config() -> MultiModelRouterConfig:
 _scorer: ComplexityScorer | None = None
 _router: Router | None = None
 _escalation_policy: EscalationPolicy | None = None
+_cost_collector: CostCollector | None = None
 
 
 def get_scorer() -> ComplexityScorer:
@@ -50,9 +52,18 @@ def get_escalation_policy() -> EscalationPolicy:
     return _escalation_policy
 
 
+def get_cost_collector() -> CostCollector:
+    """Return a shared :class:`CostCollector` instance."""
+    global _cost_collector
+    if _cost_collector is None:
+        _cost_collector = CostCollector()
+    return _cost_collector
+
+
 async def cleanup() -> None:
     """Close shared resources on shutdown."""
-    global _scorer, _router, _escalation_policy
+    global _scorer, _router, _escalation_policy, _cost_collector
     _scorer = None
     _router = None
     _escalation_policy = None
+    _cost_collector = None

@@ -8,9 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from architect_common.enums import HealthStatus
-from spec_engine.api.dependencies import get_spec_parser
+from architect_llm.client import LLMClient
+from spec_engine.api.dependencies import get_llm_client, get_spec_parser
 from spec_engine.models import SpecResult
 from spec_engine.parser import SpecParser
+from spec_engine.scope_governor import ScopeGovernor
+from spec_engine.stakeholder_simulator import StakeholderSimulator
 from spec_engine.validator import SpecValidator
 
 router = APIRouter()
@@ -43,6 +46,13 @@ class SpecResponse(BaseModel):
 
     result: dict[str, Any]
     validation_issues: list[str] = Field(default_factory=list)
+
+
+class ReviewResponse(BaseModel):
+    """Response body for POST /api/v1/specs/{spec_id}/review."""
+
+    stakeholder_review: dict[str, Any]
+    scope_report: dict[str, Any]
 
 
 class HealthResponse(BaseModel):
@@ -131,6 +141,38 @@ async def clarify_spec(
     return SpecResponse(
         result=result.model_dump(mode="json"),
         validation_issues=validation_issues,
+    )
+
+
+@router.post("/api/v1/specs/{spec_id}/review", response_model=ReviewResponse)
+async def review_spec(
+    spec_id: str,
+    llm_client: LLMClient = Depends(get_llm_client),
+) -> ReviewResponse:
+    """Run stakeholder simulation and scope evaluation on an existing spec."""
+    stored = _spec_store.get(spec_id)
+    if stored is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No spec found for id={spec_id}",
+        )
+
+    result = SpecResult.model_validate(stored["result"])
+    if result.spec is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot review a spec that has not been fully parsed.",
+        )
+
+    simulator = StakeholderSimulator(llm_client)
+    governor = ScopeGovernor(llm_client)
+
+    stakeholder_review = await simulator.simulate(result.spec)
+    scope_report = await governor.evaluate(result.spec)
+
+    return ReviewResponse(
+        stakeholder_review=stakeholder_review.model_dump(mode="json"),
+        scope_report=scope_report.model_dump(mode="json"),
     )
 
 

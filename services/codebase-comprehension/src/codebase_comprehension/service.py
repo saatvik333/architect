@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -17,6 +18,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Manage startup and shutdown lifecycle for the Codebase Comprehension service."""
     config = get_config()
     setup_logging(log_level=config.log_level)
+
+    # Optionally initialise vector store and embedding generator
+    database_url = os.environ.get("CODEBASE_DATABASE_URL")
+    if database_url:
+        try:
+            from codebase_comprehension.embeddings import EmbeddingGenerator
+            from codebase_comprehension.vector_store import VectorStore
+
+            app.state.vector_store = VectorStore(database_url)
+            app.state.embedding_generator = EmbeddingGenerator()
+        except ImportError:
+            pass
+
     yield
     await cleanup()
 
@@ -25,8 +39,11 @@ def create_app() -> FastAPI:
     """Build and return the configured FastAPI application."""
     app = FastAPI(
         title="ARCHITECT Codebase Comprehension",
-        description="AST-based code indexing and context assembly for the ARCHITECT system.",
-        version="0.1.0",
+        description=(
+            "Multi-language tree-sitter code indexing, semantic search via pgvector, "
+            "and context assembly for the ARCHITECT system."
+        ),
+        version="0.2.0",
         lifespan=lifespan,
     )
     app.include_router(router)

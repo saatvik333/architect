@@ -487,8 +487,18 @@ Each Phase 2 service follows the Phase 1 pattern: `pydantic_settings.BaseSetting
 
 Intentionally deferred to later phases:
 
-- **Vector embeddings for code search** — Phase 2 uses keyword matching in `ContextAssembler`. Semantic embeddings (pgvector/Qdrant) are Phase 3 with Knowledge Memory
 - **Persistent message bus DLQ** — In-memory only. Redis persistence comes with Phase 3 Economic Governor monitoring
 - **Spec persistence to Postgres** — In-memory dict. Database persistence comes when multi-project support is needed
 - **Dynamic budget adjustment** — Fixed thresholds. The Economic Governor (Phase 3) will make them dynamic based on burn rate
 - **Human escalation UI** — The `needs_human` flag is set but not surfaced. The Human Interface (Phase 5) will consume it
+
+## Phase 2 Additions (pulled forward from Phase 3)
+
+The following were originally deferred to Phase 3 but have been implemented in Phase 2:
+
+- **Vector embeddings for code search** — `ContextAssembler` now supports hybrid semantic + keyword search via pgvector. `TreeSitterIndexer` provides multi-language AST parsing (Python, JavaScript, TypeScript). `EmbeddingGenerator` uses sentence-transformers (`all-MiniLM-L6-v2`) for code embeddings.
+- **Spec Engine subagents** — `StakeholderSimulator` role-plays 4 personas (end user, security reviewer, PM, ops engineer). `ScopeGovernor` assesses MVP fitness and flags scope creep.
+- **Multi-Model Router cost tracking** — `CostCollector` tracks per-tier token consumption and computes savings vs all-Tier-1 baseline.
+- **Git commit integration** — `GitCommitter` in the Coding Agent commits generated code and updates the World State Ledger after evaluation passes.
+- **Dashboard task DAG visualization** — React Flow-based interactive graph view with dagre layout.
+- **PromptFoo prompt regression testing** — Test suites for spec parsing, code generation, adversarial testing, and stakeholder simulation prompts.

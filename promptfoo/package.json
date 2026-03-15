@@ -1,0 +1,12 @@
+{
+  "name": "architect-promptfoo",
+  "private": true,
+  "scripts": {
+    "test": "promptfoo eval",
+    "test:view": "promptfoo view",
+    "test:suite": "promptfoo eval -c"
+  },
+  "dependencies": {
+    "promptfoo": "^0.100"
+  }
+}

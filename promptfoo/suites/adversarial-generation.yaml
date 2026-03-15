@@ -1,0 +1,128 @@
+# Adversarial Test Generation — prompt regression tests
+# Source: services/evaluation-engine/src/evaluation_engine/layers/adversarial.py
+
+description: "Adversarial test generation prompt regression tests"
+
+providers:
+  - id: anthropic:messages:claude-sonnet-4-20250514
+    config:
+      max_tokens: 4000
+      temperature: 0.3
+
+prompts:
+  - label: "adversarial-test-gen"
+    raw: |-
+      You are a security-focused test engineer. Given the source code below, generate
+      a Python test file (pytest) that exercises adversarial edge cases:
+      - Null / empty inputs
+      - Injection attacks (SQL, command, path traversal)
+      - Boundary values (max int, empty strings, huge payloads)
+      - Type confusion
+
+      Output ONLY valid Python code for a test file, no markdown fences.
+
+tests:
+  - description: "Code with potential null handling issues"
+    vars:
+      source_code: |-
+        def get_user_name(user: dict) -> str:
+            return user["name"].strip().title()
+
+        def format_greeting(name: str) -> str:
+            return f"Hello, {name}! Welcome back."
+
+        def process_users(users: list[dict]) -> list[str]:
+            return [format_greeting(get_user_name(u)) for u in users]
+    assert:
+      - type: contains
+        value: "def test_"
+      - type: javascript
+        value: "output.includes('None') || output.includes('none') || output.includes('empty') || output.includes('{}') || output.includes('[]')"
+      - type: contains
+        value: "import pytest"
+
+  - description: "Code with SQL-like string operations"
+    vars:
+      source_code: |-
+        def build_query(table: str, filters: dict[str, str]) -> str:
+            conditions = " AND ".join(f"{k} = '{v}'" for k, v in filters.items())
+            return f"SELECT * FROM {table} WHERE {conditions}"
+
+        def search_users(name: str) -> str:
+            return build_query("users", {"name": name})
+    assert:
+      - type: contains
+        value: "def test_"
+      - type: javascript
+        value: >-
+          const lower = output.toLowerCase();
+          lower.includes('injection') || lower.includes("'") || lower.includes('drop') || lower.includes('robert')
+      - type: contains
+        value: "import pytest"
+
+  - description: "Code with file operations"
+    vars:
+      source_code: |-
+        import os
+
+        def read_config(config_name: str) -> str:
+            path = os.path.join("/etc/app/configs", config_name)
+            with open(path) as f:
+                return f.read()
+
+        def write_log(filename: str, content: str) -> None:
+            path = os.path.join("/var/log/app", filename)
+            with open(path, "a") as f:
+                f.write(content + "\n")
+    assert:
+      - type: contains
+        value: "def test_"
+      - type: javascript
+        value: >-
+          const lower = output.toLowerCase();
+          lower.includes('traversal') || lower.includes('..') || lower.includes('../') || lower.includes('path')
+      - type: contains
+        value: "import pytest"
+
+  - description: "Code with authentication logic"
+    vars:
+      source_code: |-
+        import hashlib
+
+        def verify_password(stored_hash: str, password: str) -> bool:
+            computed = hashlib.sha256(password.encode()).hexdigest()
+            return computed == stored_hash
+
+        def check_admin(token: str, admin_tokens: list[str]) -> bool:
+            return token in admin_tokens
+
+        def login(username: str, password: str, user_db: dict) -> str | None:
+            if username in user_db:
+                if verify_password(user_db[username], password):
+                    return f"token_{username}"
+            return None
+    assert:
+      - type: contains
+        value: "def test_"
+      - type: javascript
+        value: >-
+          const lower = output.toLowerCase();
+          lower.includes('empty') || lower.includes('none') || lower.includes('blank') || lower.includes('""')
+      - type: contains
+        value: "import pytest"
+
+defaultTest:
+  vars:
+    source_code: "{{source_code}}"
+  metadata:
+    source: "services/evaluation-engine/src/evaluation_engine/layers/adversarial.py"
+
+scenarios:
+  - config:
+      - prompt:
+          raw: |-
+            {{prompts.adversarial-test-gen}}
+
+            Source code:
+
+            {{source_code}}

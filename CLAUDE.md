@@ -12,11 +12,14 @@ A multi-agent system that replaces the software engineering loop: specify → bu
 
 ## Tech Stack
 - Python 3.12+, uv, hatchling
-- Postgres 16, Redis 7, Temporal, NATS
+- Postgres 16 (with pgvector extension), Redis 7, Temporal, NATS
 - FastAPI, SQLAlchemy (async), Alembic
 - Anthropic SDK (Claude API)
 - Docker for sandboxing
 - Bun (for dashboard app JS/TS tooling — never use npm)
+- tree-sitter (multi-language AST parsing in Codebase Comprehension)
+- sentence-transformers (code embedding generation)
+- PromptFoo (LLM prompt regression testing)
 
 ## Conventions
 - All domain models use Pydantic v2 with `frozen=True` (immutable by default)
@@ -36,6 +39,7 @@ A multi-agent system that replaces the software engineering loop: specify → bu
 - `make test-integration` — integration tests (requires infra)
 - `make infra-up` / `make infra-down` — docker compose
 - `make dev` — full local environment
+- `make promptfoo-test` — run LLM prompt regression tests (requires ANTHROPIC_API_KEY)
 
 ## Documentation Maintenance
 After completing any non-trivial change, automatically:

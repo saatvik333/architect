@@ -9,8 +9,10 @@ from temporalio import activity
 from architect_common.logging import get_logger
 from architect_llm.client import LLMClient
 from spec_engine.config import SpecEngineConfig
-from spec_engine.models import TaskSpec
+from spec_engine.models import ScopeConstraints, TaskSpec
 from spec_engine.parser import SpecParser
+from spec_engine.scope_governor import ScopeGovernor
+from spec_engine.stakeholder_simulator import StakeholderSimulator
 from spec_engine.validator import SpecValidator
 
 logger = get_logger(component="spec_engine.temporal.activities")
@@ -61,3 +63,66 @@ async def validate_spec(spec_dict: dict[str, Any]) -> list[str]:
     spec = TaskSpec.model_validate(spec_dict)
     validator = SpecValidator()
     return validator.validate(spec)
+
+
+@activity.defn
+async def simulate_stakeholders(spec_dict: dict[str, Any]) -> dict[str, Any]:
+    """Run stakeholder simulation on a spec.
+
+    Args:
+        spec_dict: A serialised :class:`TaskSpec` dict.
+
+    Returns:
+        A serialised :class:`StakeholderReview` dict.
+    """
+    activity.logger.info("simulate_stakeholders activity started")
+
+    config = SpecEngineConfig()
+    llm_client = LLMClient(
+        api_key=config.architect.claude.api_key.get_secret_value(),
+        default_model=config.architect.claude.model_id,
+    )
+
+    try:
+        spec = TaskSpec.model_validate(spec_dict)
+        simulator = StakeholderSimulator(llm_client)
+        review = await simulator.simulate(spec)
+        return review.model_dump(mode="json")
+    finally:
+        await llm_client.close()
+
+
+@activity.defn
+async def govern_scope(
+    spec_dict: dict[str, Any],
+    constraints_dict: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Evaluate a spec's scope against constraints.
+
+    Args:
+        spec_dict: A serialised :class:`TaskSpec` dict.
+        constraints_dict: Optional serialised :class:`ScopeConstraints` dict.
+
+    Returns:
+        A serialised :class:`ScopeReport` dict.
+    """
+    activity.logger.info("govern_scope activity started")
+
+    config = SpecEngineConfig()
+    llm_client = LLMClient(
+        api_key=config.architect.claude.api_key.get_secret_value(),
+        default_model=config.architect.claude.model_id,
+    )
+
+    try:
+        spec = TaskSpec.model_validate(spec_dict)
+        constraints = (
+            ScopeConstraints.model_validate(constraints_dict)
+            if constraints_dict is not None
+            else None
+        )
+        governor = ScopeGovernor(llm_client)
+        report = await governor.evaluate(spec, constraints=constraints)
+        return report.model_dump(mode="json")
+    finally:
+        await llm_client.close()

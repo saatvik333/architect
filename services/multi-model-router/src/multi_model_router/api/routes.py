@@ -2,30 +2,33 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from architect_common.enums import HealthStatus
-from multi_model_router.models import RouteRequest, RouteResponse, RoutingStats
+from multi_model_router.cost_collector import CostCollector
+from multi_model_router.models import (
+    CostSummary,
+    RouteRequest,
+    RouteResponse,
+    RoutingStats,
+)
 from multi_model_router.router import Router
 from multi_model_router.scorer import ComplexityScorer
 
-from .dependencies import get_router, get_scorer
+from .dependencies import get_cost_collector, get_router, get_scorer
 
 router = APIRouter()
 
-# ── In-memory stats tracking ────────────────────────────────────────
-_stats: dict[str, Any] = {
-    "total_requests": 0,
-    "tier_distribution": {},
-    "escalation_count": 0,
-    "complexity_sum": 0.0,
-}
+
+# ── Request / Response schemas ─────────────────────────────────────
 
 
-# ── Response schemas ────────────────────────────────────────────────
+class RouteRequestWithTokens(RouteRequest, frozen=True):
+    """Extended route request that accepts optional token counts for cost tracking."""
+
+    input_tokens: int = Field(default=0, ge=0)
+    output_tokens: int = Field(default=0, ge=0)
 
 
 class HealthResponse(BaseModel):
@@ -40,9 +43,10 @@ class HealthResponse(BaseModel):
 
 @router.post("/api/v1/route", response_model=RouteResponse)
 async def route_task(
-    body: RouteRequest,
+    body: RouteRequestWithTokens,
     scorer: ComplexityScorer = Depends(get_scorer),
     task_router: Router = Depends(get_router),
+    cost_collector: CostCollector = Depends(get_cost_collector),
 ) -> RouteResponse:
     """Score task complexity and route to the appropriate model tier."""
     complexity = scorer.score(
@@ -58,27 +62,38 @@ async def route_task(
         complexity=complexity,
     )
 
-    # Update stats
-    _stats["total_requests"] += 1
-    _stats["complexity_sum"] += complexity.score
-    tier_key = decision.selected_tier.value
-    _stats["tier_distribution"][tier_key] = _stats["tier_distribution"].get(tier_key, 0) + 1
+    # Record cost if token counts provided
+    if body.input_tokens > 0 or body.output_tokens > 0:
+        cost_collector.record_routing(
+            decision=decision,
+            input_tokens=body.input_tokens,
+            output_tokens=body.output_tokens,
+        )
+    else:
+        # Still record routing for stats (zero tokens)
+        cost_collector.record_routing(
+            decision=decision,
+            input_tokens=0,
+            output_tokens=0,
+        )
 
     return RouteResponse(decision=decision)
 
 
-@router.get("/api/v1/route/stats", response_model=RoutingStats)
-async def get_stats() -> RoutingStats:
-    """Return aggregate routing statistics."""
-    total = _stats["total_requests"]
-    avg = _stats["complexity_sum"] / total if total > 0 else 0.0
+@router.get("/api/v1/route/costs", response_model=CostSummary)
+async def get_costs(
+    cost_collector: CostCollector = Depends(get_cost_collector),
+) -> CostSummary:
+    """Return aggregated cost information across all tiers."""
+    return cost_collector.get_cost_summary()
 
-    return RoutingStats(
-        total_requests=total,
-        tier_distribution=dict(_stats["tier_distribution"]),
-        escalation_count=_stats["escalation_count"],
-        average_complexity=round(avg, 4),
-    )
+
+@router.get("/api/v1/route/stats", response_model=RoutingStats)
+async def get_stats(
+    cost_collector: CostCollector = Depends(get_cost_collector),
+) -> RoutingStats:
+    """Return aggregate routing statistics."""
+    return cost_collector.get_stats()
 
 
 @router.get("/health", response_model=HealthResponse)

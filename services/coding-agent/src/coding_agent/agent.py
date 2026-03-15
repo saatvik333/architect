@@ -9,6 +9,7 @@ from architect_common.logging import get_logger
 from architect_events.schemas import AgentCompletedEvent, EventEnvelope
 from architect_sandbox_client.models import ExecutionRequest, ExecutionResult
 from coding_agent.coder import CodeGenerator
+from coding_agent.git import GitCommitError, GitCommitter
 from coding_agent.models import (
     AgentConfig,
     AgentOutput,
@@ -142,11 +143,17 @@ class CodingAgentLoop:
             # Build the commit message
             commit_message = self._build_commit_message(run, files)
 
+            # Commit generated code to the repository
+            commit_hash = ""
+            if not errors:
+                commit_hash = await self._try_commit(files, commit_message, run.repo_path)
+
             output = AgentOutput(
                 task_id=run.task_id,
                 agent_id=run.id,
                 files=files,
                 commit_message=commit_message,
+                commit_hash=commit_hash,
                 reasoning_summary=plan[:500],
                 tokens_used=total_tokens,
                 model_id=config.model_id,
@@ -205,6 +212,32 @@ class CodingAgentLoop:
             f"Task: {run.task_id}\n"
             f"Agent: {run.id}"
         )
+
+    @staticmethod
+    async def _try_commit(
+        files: list[GeneratedFile],
+        commit_message: str,
+        repo_path: str,
+    ) -> str:
+        """Attempt to commit generated files to the git repository.
+
+        Returns the commit hash on success, or an empty string if the
+        commit fails (e.g. repo_path is not a git repo).
+        """
+        committer = GitCommitter()
+        try:
+            return await committer.commit(
+                files=files,
+                message=commit_message,
+                repo_path=repo_path,
+            )
+        except GitCommitError:
+            logger.warning(
+                "git commit skipped (non-fatal)",
+                repo_path=repo_path,
+                exc_info=True,
+            )
+            return ""
 
     async def _publish_completed(self, run: AgentRun, tokens: int) -> None:
         """Publish an agent.completed event."""

@@ -58,6 +58,7 @@ class AgentOutput(ArchitectBase):
     agent_id: AgentId
     files: list[GeneratedFile] = Field(default_factory=list)
     commit_message: str = ""
+    commit_hash: str = ""
     reasoning_summary: str = ""
     tokens_used: int = Field(default=0, ge=0)
     model_id: str = ""
@@ -87,6 +88,10 @@ class AgentRun(ArchitectBase):
     status: StatusEnum = StatusEnum.PENDING
     spec_context: SpecContext = Field(default_factory=SpecContext)
     codebase_context: CodebaseContext = Field(default_factory=CodebaseContext)
+    repo_path: str = Field(
+        default=".",
+        description="Path to the git repository for committing generated code.",
+    )
     output: AgentOutput | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None

@@ -39,6 +39,33 @@ class EscalationRecord(ArchitectBase):
     needs_human: bool = False
 
 
+class TierCost(ArchitectBase):
+    """Per-tier cost breakdown."""
+
+    tier: ModelTier
+    total_tokens: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_cost_usd: float = 0.0
+
+
+class CostSummary(ArchitectBase):
+    """Aggregate cost information across all tiers."""
+
+    total_cost_usd: float = 0.0
+    cost_by_tier: list[TierCost] = Field(default_factory=list)
+    total_requests: int = 0
+
+
+class CostSavingsReport(ArchitectBase):
+    """Comparison of actual cost vs hypothetical all-Tier-1 cost."""
+
+    actual_cost_usd: float = 0.0
+    hypothetical_all_tier1_cost_usd: float = 0.0
+    savings_usd: float = 0.0
+    savings_percentage: float = 0.0
+
+
 class RoutingStats(ArchitectBase):
     """Aggregate routing statistics."""
 
@@ -46,6 +73,8 @@ class RoutingStats(ArchitectBase):
     tier_distribution: dict[str, int] = Field(default_factory=dict)
     escalation_count: int = 0
     average_complexity: float = 0.0
+    total_cost_usd: float = 0.0
+    estimated_savings_usd: float = 0.0
 
 
 class RouteRequest(ArchitectBase):

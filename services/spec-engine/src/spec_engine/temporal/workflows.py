@@ -8,7 +8,12 @@ from typing import Any
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from spec_engine.temporal.activities import parse_spec, validate_spec
+    from spec_engine.temporal.activities import (
+        govern_scope,
+        parse_spec,
+        simulate_stakeholders,
+        validate_spec,
+    )
 
 
 @workflow.defn
@@ -45,6 +50,9 @@ class SpecificationWorkflow:
 
         # Step 2: Validate the spec if one was produced
         validation_issues: list[str] = []
+        stakeholder_review: dict[str, Any] | None = None
+        scope_report: dict[str, Any] | None = None
+
         if result_dict.get("spec") is not None:
             validation_issues = await workflow.execute_activity(
                 validate_spec,
@@ -52,7 +60,22 @@ class SpecificationWorkflow:
                 start_to_close_timeout=timedelta(minutes=1),
             )
 
+            # Step 3: Run stakeholder simulation and scope governance
+            stakeholder_review = await workflow.execute_activity(
+                simulate_stakeholders,
+                args=[result_dict["spec"]],
+                start_to_close_timeout=timedelta(minutes=5),
+            )
+
+            scope_report = await workflow.execute_activity(
+                govern_scope,
+                args=[result_dict["spec"], None],
+                start_to_close_timeout=timedelta(minutes=5),
+            )
+
         return {
             "result": result_dict,
             "validation_issues": validation_issues,
+            "stakeholder_review": stakeholder_review,
+            "scope_report": scope_report,
         }

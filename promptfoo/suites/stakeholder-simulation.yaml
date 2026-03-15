@@ -1,0 +1,201 @@
+# Stakeholder Simulation — prompt regression tests
+# Source: services/spec-engine/src/spec_engine/stakeholder_simulator.py
+#         services/spec-engine/src/spec_engine/scope_governor.py
+
+description: "Stakeholder simulation prompt regression tests"
+
+providers:
+  - id: anthropic:messages:claude-sonnet-4-20250514
+    config:
+      max_tokens: 4096
+      temperature: 0.3
+
+prompts:
+  - label: "stakeholder-simulator"
+    raw: |-
+      You are a stakeholder simulation engine. Given a software specification, you must role-play exactly 4 personas and review the spec from each perspective:
+
+      1. **End User** — focuses on usability, clarity, and whether the feature meets real needs.
+      2. **Security Reviewer** — focuses on attack surface, data exposure, auth, and trust boundaries.
+      3. **Product Manager** — focuses on business value, prioritisation, and alignment with goals.
+      4. **Ops Engineer** — focuses on deployability, observability, performance, and failure modes.
+
+      For each persona, raise zero or more concerns. Each concern has:
+      - ``role``: one of "end_user", "security_reviewer", "product_manager", "ops_engineer"
+      - ``concern``: a concise description of the issue
+      - ``severity``: "low", "medium", or "high"
+      - ``suggestion``: a concrete recommendation to address the concern
+
+      After listing all concerns, provide:
+      - ``overall_risk``: "low", "medium", or "high" (the highest severity among all concerns, or "low" if there are none)
+      - ``summary``: a 1-2 sentence overall assessment
+
+      Respond with ONLY valid JSON in this format:
+      {
+        "concerns": [
+          {"role": "...", "concern": "...", "severity": "low|medium|high", "suggestion": "..."}
+        ],
+        "overall_risk": "low|medium|high",
+        "summary": "..."
+      }
+
+tests:
+  - description: "Simple CRUD spec"
+    vars:
+      spec: |-
+        Intent: Build a basic CRUD API for managing blog posts
+        Constraints: Must use FastAPI and PostgreSQL
+        Success Criteria:
+          - Create, read, update, delete endpoints work correctly
+          - Input validation on all endpoints
+          - Pagination support for list endpoint
+        File Targets: services/blog/api.py, services/blog/models.py
+        Assumptions: PostgreSQL is already provisioned
+        Open Questions: None
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "JSON.parse(output).concerns.length >= 1"
+      - type: javascript
+        value: >-
+          const roles = JSON.parse(output).concerns.map(c => c.role);
+          const uniqueRoles = [...new Set(roles)];
+          uniqueRoles.length >= 2
+      - type: javascript
+        value: "['low','medium','high'].includes(JSON.parse(output).overall_risk)"
+      - type: javascript
+        value: "JSON.parse(output).summary.length > 0"
+
+  - description: "Security-sensitive spec (auth system)"
+    vars:
+      spec: |-
+        Intent: Implement user authentication with password storage and session management
+        Constraints: Must support OAuth2 and JWT tokens
+        Success Criteria:
+          - Users can register with email and password
+          - Passwords are stored securely
+          - JWT tokens issued on login with configurable expiry
+          - OAuth2 integration with Google and GitHub
+        File Targets: services/auth/api.py, services/auth/models.py, services/auth/oauth.py
+        Assumptions: Redis available for session storage
+        Open Questions: None
+    assert:
+      - type: is-json
+      - type: javascript
+        value: >-
+          const concerns = JSON.parse(output).concerns;
+          concerns.some(c => c.role === 'security_reviewer')
+      - type: javascript
+        value: >-
+          const concerns = JSON.parse(output).concerns;
+          const securityConcerns = concerns.filter(c => c.role === 'security_reviewer');
+          securityConcerns.length >= 1
+      - type: javascript
+        value: >-
+          const parsed = JSON.parse(output);
+          parsed.overall_risk === 'medium' || parsed.overall_risk === 'high'
+      - type: javascript
+        value: "JSON.parse(output).summary.length > 0"
+
+  - description: "Performance-critical spec"
+    vars:
+      spec: |-
+        Intent: Build a real-time event streaming service processing 100k events/second
+        Constraints: Must use NATS for messaging, sub-100ms p99 latency
+        Success Criteria:
+          - Sustain 100k events/second throughput
+          - p99 latency under 100ms
+          - Graceful degradation under load
+          - At-least-once delivery guarantee
+        File Targets: services/streaming/consumer.py, services/streaming/producer.py
+        Assumptions: NATS cluster with 3 nodes available
+        Open Questions: None
+    assert:
+      - type: is-json
+      - type: javascript
+        value: >-
+          const concerns = JSON.parse(output).concerns;
+          concerns.some(c => c.role === 'ops_engineer')
+      - type: javascript
+        value: >-
+          const allText = JSON.stringify(JSON.parse(output)).toLowerCase();
+          allText.includes('performance') || allText.includes('latency') || allText.includes('throughput') || allText.includes('scaling')
+      - type: javascript
+        value: "JSON.parse(output).concerns.length >= 2"
+      - type: javascript
+        value: "JSON.parse(output).summary.length > 0"
+
+  - description: "User-facing UI spec"
+    vars:
+      spec: |-
+        Intent: Create a dashboard page showing real-time system health metrics
+        Constraints: React + TypeScript, must support mobile viewport
+        Success Criteria:
+          - Display CPU, memory, disk, and network metrics
+          - Auto-refresh every 5 seconds via WebSocket
+          - Responsive layout for mobile and desktop
+          - Color-coded status indicators (green/yellow/red)
+        File Targets: apps/dashboard/src/pages/Health.tsx, apps/dashboard/src/components/MetricCard.tsx
+        Assumptions: Backend WebSocket API already exists
+        Open Questions: None
+    assert:
+      - type: is-json
+      - type: javascript
+        value: >-
+          const concerns = JSON.parse(output).concerns;
+          concerns.some(c => c.role === 'end_user')
+      - type: javascript
+        value: >-
+          const allText = JSON.stringify(JSON.parse(output)).toLowerCase();
+          allText.includes('usability') || allText.includes('accessibility') || allText.includes('mobile') || allText.includes('user')
+      - type: javascript
+        value: "JSON.parse(output).concerns.length >= 2"
+      - type: javascript
+        value: "JSON.parse(output).summary.length > 0"
+
+  - description: "Scope governor — large spec should flag scope creep"
+    vars:
+      spec: |-
+        Intent: Build a full e-commerce platform with user accounts, product catalog, shopping cart, payment processing, order management, inventory tracking, email notifications, analytics dashboard, admin panel, and recommendation engine
+        Constraints: None specified
+        Success Criteria:
+          - Users can browse products and add to cart
+          - Stripe payment integration
+          - Order tracking with email notifications
+          - Admin can manage products and view analytics
+          - ML-powered product recommendations
+        File Targets: Too many to list
+        Assumptions: None
+        Open Questions: None
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "JSON.parse(output).concerns.length >= 3"
+      - type: javascript
+        value: >-
+          const concerns = JSON.parse(output).concerns;
+          concerns.some(c => c.role === 'product_manager')
+      - type: javascript
+        value: >-
+          const allText = JSON.stringify(JSON.parse(output)).toLowerCase();
+          allText.includes('scope') || allText.includes('mvp') || allText.includes('priorit') || allText.includes('phased')
+      - type: javascript
+        value: >-
+          const parsed = JSON.parse(output);
+          parsed.overall_risk === 'medium' || parsed.overall_risk === 'high'
+
+defaultTest:
+  vars:
+    spec: "{{spec}}"
+  metadata:
+    source: "services/spec-engine/src/spec_engine/stakeholder_simulator.py"
+
+scenarios:
+  - config:
+      - prompt:
+          raw: |-
+            {{prompts.stakeholder-simulator}}
+
+            Review this specification:
+
+            {{spec}}

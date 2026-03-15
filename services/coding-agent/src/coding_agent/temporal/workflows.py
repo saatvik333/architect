@@ -9,9 +9,11 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from coding_agent.temporal.activities import (
+        commit_code,
         execute_in_sandbox,
         generate_code,
         plan_task,
+        update_world_state,
     )
 
 
@@ -84,8 +86,38 @@ class CodingAgentWorkflow:
                     start_to_close_timeout=timedelta(minutes=10),
                 )
 
-        return {
+        result: dict[str, Any] = {
             "plan": plan,
             "files": files,
             "test_result": test_result,
+            "commit_hash": "",
+            "wsl_proposal_id": "",
+            "wsl_accepted": False,
         }
+
+        # If tests passed, commit and update world state
+        if all_passed:
+            repo_path = run_data.get("repo_path", ".")
+            commit_message = run_data.get("commit_message", "feat: agent-generated code")
+
+            commit_result = await workflow.execute_activity(
+                commit_code,
+                args=[files, commit_message, repo_path],
+                start_to_close_timeout=timedelta(minutes=5),
+            )
+            result["commit_hash"] = commit_result.get("commit_hash", "")
+
+            # Update World State Ledger
+            wsl_base_url = run_data.get("wsl_base_url", "http://localhost:8001")
+            task_id = run_data.get("task_id", "")
+            agent_id = run_data.get("agent_id", "")
+
+            wsl_result = await workflow.execute_activity(
+                update_world_state,
+                args=[result["commit_hash"], task_id, agent_id, wsl_base_url],
+                start_to_close_timeout=timedelta(minutes=2),
+            )
+            result["wsl_proposal_id"] = wsl_result.get("proposal_id", "")
+            result["wsl_accepted"] = wsl_result.get("accepted", False)
+
+        return result

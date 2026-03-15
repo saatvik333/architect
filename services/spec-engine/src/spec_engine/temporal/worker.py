@@ -9,7 +9,12 @@ from temporalio.worker import Worker
 
 from architect_common.logging import get_logger, setup_logging
 from spec_engine.config import SpecEngineConfig
-from spec_engine.temporal.activities import parse_spec, validate_spec
+from spec_engine.temporal.activities import (
+    govern_scope,
+    parse_spec,
+    simulate_stakeholders,
+    validate_spec,
+)
 from spec_engine.temporal.workflows import SpecificationWorkflow
 
 logger = get_logger(component="spec_engine.temporal.worker")
@@ -36,7 +41,7 @@ async def run_worker() -> None:
         client,
         task_queue=config.temporal_task_queue,
         workflows=[SpecificationWorkflow],
-        activities=[parse_spec, validate_spec],
+        activities=[parse_spec, validate_spec, simulate_stakeholders, govern_scope],
     )
 
     logger.info("spec engine worker started", task_queue=config.temporal_task_queue)

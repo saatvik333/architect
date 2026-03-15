@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from codebase_comprehension.architecture_map import ArchitectureMapGenerator
 from codebase_comprehension.ast_indexer import ASTIndexer
 from codebase_comprehension.config import CodebaseComprehensionConfig
 from codebase_comprehension.context_assembler import ContextAssembler
@@ -19,6 +20,7 @@ def get_config() -> CodebaseComprehensionConfig:
 _index_store: IndexStore | None = None
 _ast_indexer: ASTIndexer | None = None
 _context_assembler: ContextAssembler | None = None
+_architecture_map_generator: ArchitectureMapGenerator | None = None
 
 
 def get_index_store() -> IndexStore:
@@ -45,9 +47,18 @@ def get_context_assembler() -> ContextAssembler:
     return _context_assembler
 
 
+def get_architecture_map_generator() -> ArchitectureMapGenerator:
+    """Return a shared :class:`ArchitectureMapGenerator` instance."""
+    global _architecture_map_generator
+    if _architecture_map_generator is None:
+        _architecture_map_generator = ArchitectureMapGenerator()
+    return _architecture_map_generator
+
+
 async def cleanup() -> None:
     """Close shared resources on shutdown."""
-    global _index_store, _ast_indexer, _context_assembler
+    global _index_store, _ast_indexer, _context_assembler, _architecture_map_generator
     _index_store = None
     _ast_indexer = None
     _context_assembler = None
+    _architecture_map_generator = None

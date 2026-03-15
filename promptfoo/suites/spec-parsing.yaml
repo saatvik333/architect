@@ -1,0 +1,125 @@
+# Spec Engine Parser — prompt regression tests
+# Source: services/spec-engine/src/spec_engine/parser.py
+
+description: "Spec Engine Parser prompt regression tests"
+
+providers:
+  - id: anthropic:messages:claude-sonnet-4-20250514
+    config:
+      max_tokens: 4096
+      temperature: 0.1
+
+prompts:
+  - label: "spec-parser"
+    raw: |-
+      You are a specification engine for the ARCHITECT autonomous coding system.
+      Your job is to transform vague human intent into a precise, testable specification.
+
+      Given raw text describing what the user wants, extract:
+      1. **intent** — a clear one-sentence summary of the goal
+      2. **constraints** — any limitations or requirements mentioned
+      3. **success_criteria** — concrete, testable acceptance criteria
+      4. **file_targets** — files likely to be created or modified
+      5. **assumptions** — assumptions you are making
+      6. **open_questions** — anything ambiguous that needs clarification
+
+      If the input is too ambiguous to produce a useful spec, return clarification questions instead.
+
+      Respond with ONLY valid JSON in one of these two formats:
+
+      Format A (complete spec):
+      {
+        "type": "spec",
+        "intent": "...",
+        "constraints": ["..."],
+        "success_criteria": [
+          {"description": "...", "test_type": "unit|integration|adversarial", "automated": true}
+        ],
+        "file_targets": ["..."],
+        "assumptions": ["..."],
+        "open_questions": ["..."]
+      }
+
+      Format B (needs clarification):
+      {
+        "type": "clarification",
+        "questions": [
+          {"question": "...", "context": "...", "priority": "high|medium|low"}
+        ]
+      }
+
+tests:
+  - vars:
+      requirement: "Build a REST API for user management with CRUD endpoints, JWT authentication, and role-based access control"
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "JSON.parse(output).type === 'spec'"
+      - type: javascript
+        value: "JSON.parse(output).intent.length > 0"
+      - type: javascript
+        value: "JSON.parse(output).success_criteria.length > 0"
+      - type: javascript
+        value: "JSON.parse(output).constraints.length >= 0"
+
+  - vars:
+      requirement: "Make it better"
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "JSON.parse(output).type === 'clarification'"
+      - type: javascript
+        value: "JSON.parse(output).questions.length > 0"
+
+  - vars:
+      requirement: "Create a data pipeline with three modules: an ingestion service that reads from S3, a transformation engine using pandas, and a storage layer writing to PostgreSQL. Each module should have its own API and be independently deployable."
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "JSON.parse(output).type === 'spec'"
+      - type: javascript
+        value: "JSON.parse(output).file_targets.length >= 2"
+      - type: javascript
+        value: "JSON.parse(output).success_criteria.length >= 3"
+
+  - vars:
+      requirement: "Build an authentication service that stores user passwords, handles OAuth2 flows, manages API keys, and provides session tokens with configurable expiry"
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "JSON.parse(output).type === 'spec'"
+      - type: javascript
+        value: "JSON.parse(output).intent.length > 0"
+      - type: javascript
+        value: >-
+          const parsed = JSON.parse(output);
+          const allText = JSON.stringify(parsed).toLowerCase();
+          allText.includes('security') || allText.includes('auth') || allText.includes('encrypt') || allText.includes('hash')
+
+  - vars:
+      requirement: "Fix the bug"
+    assert:
+      - type: is-json
+      - type: javascript
+        value: "JSON.parse(output).type === 'clarification'"
+      - type: javascript
+        value: "JSON.parse(output).questions.length > 0"
+      - type: javascript
+        value: "JSON.parse(output).questions[0].priority === 'high'"
+
+defaultTest:
+  vars:
+    requirement: "{{requirement}}"
+  options:
+    transform: "output"
+  metadata:
+    source: "services/spec-engine/src/spec_engine/parser.py"
+
+scenarios:
+  - config:
+      - prompt:
+          raw: |-
+            {{prompts.spec-parser}}
+
+            Raw requirement:
+            {{requirement}}

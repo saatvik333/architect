@@ -10,9 +10,11 @@ from temporalio.worker import Worker
 from architect_common.logging import get_logger, setup_logging
 from coding_agent.config import CodingAgentConfig
 from coding_agent.temporal.activities import (
+    commit_code,
     execute_in_sandbox,
     generate_code,
     plan_task,
+    update_world_state,
 )
 from coding_agent.temporal.workflows import CodingAgentWorkflow
 
@@ -40,7 +42,7 @@ async def run_worker() -> None:
         client,
         task_queue=config.temporal_task_queue,
         workflows=[CodingAgentWorkflow],
-        activities=[plan_task, generate_code, execute_in_sandbox],
+        activities=[plan_task, generate_code, execute_in_sandbox, commit_code, update_world_state],
     )
 
     logger.info("coding agent worker started", task_queue=config.temporal_task_queue)

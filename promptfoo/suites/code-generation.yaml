@@ -1,0 +1,146 @@
+# Coding Agent — prompt regression tests
+# Source: services/coding-agent/src/coding_agent/context_builder.py
+#         services/coding-agent/src/coding_agent/planner.py
+
+description: "Coding Agent prompt regression tests"
+
+providers:
+  - id: anthropic:messages:claude-sonnet-4-20250514
+    config:
+      max_tokens: 4096
+      temperature: 0.2
+
+prompts:
+  - label: "code-generation-system"
+    raw: |-
+      You are a senior software engineer working on the ARCHITECT project.
+
+      ## Instructions
+      - Write clean, production-quality Python code.
+      - Follow existing conventions in the codebase.
+      - Include docstrings and type annotations.
+      - Write unit tests for all new public functions.
+      - Do not introduce new dependencies without justification.
+      - Explain your reasoning before writing code.
+      - Output each file as a fenced code block with the file path as a comment.
+
+  - label: "planning-system"
+    raw: |-
+      You are a senior software architect. Given a task specification and codebase context, produce a concise implementation plan.
+
+      The plan MUST include:
+      1. Files to create or modify (with paths)
+      2. Key design decisions and rationale
+      3. Testing strategy
+      4. Potential risks or edge cases
+
+      Output ONLY the plan as markdown, no preamble.
+
+tests:
+  - description: "Simple function implementation"
+    vars:
+      task: |-
+        ## Task: Implement a retry decorator
+        Write a Python decorator that retries a function up to N times with exponential backoff.
+
+        ### Acceptance Criteria
+        - Decorator accepts max_retries and base_delay parameters
+        - Implements exponential backoff between retries
+        - Raises the last exception if all retries fail
+
+        ## Implementation Plan
+        Create a single file with the decorator implementation and tests.
+    assert:
+      - type: contains
+        value: "def "
+      - type: contains
+        value: "retry"
+      - type: javascript
+        value: "output.includes('def ') && (output.includes('async') || output.includes('retry'))"
+
+  - description: "Class with methods"
+    vars:
+      task: |-
+        ## Task: Implement a LRU Cache class
+        Create a thread-safe LRU cache with get, put, and delete operations.
+
+        ### Acceptance Criteria
+        - Fixed capacity set at initialization
+        - O(1) get and put operations
+        - Thread-safe with a lock
+
+        ## Implementation Plan
+        Implement using OrderedDict with threading.Lock.
+    assert:
+      - type: contains
+        value: "class "
+      - type: contains
+        value: "def "
+      - type: javascript
+        value: "output.includes('class ') && output.includes('def get') && output.includes('def put')"
+
+  - description: "Async function"
+    vars:
+      task: |-
+        ## Task: Implement async HTTP health checker
+        Write an async function that checks multiple URLs concurrently and returns their health status.
+
+        ### Acceptance Criteria
+        - Accept a list of URLs
+        - Check all URLs concurrently with asyncio.gather
+        - Return dict mapping URL to (status_code, response_time_ms)
+        - Handle timeouts and connection errors gracefully
+
+        ## Implementation Plan
+        Use aiohttp with asyncio.gather for concurrent requests.
+    assert:
+      - type: contains
+        value: "async "
+      - type: contains
+        value: "await"
+      - type: javascript
+        value: "output.includes('async def') && output.includes('await')"
+
+  - description: "Function with error handling"
+    vars:
+      task: |-
+        ## Task: Implement a safe JSON file reader
+        Write a function that reads and parses a JSON file with comprehensive error handling.
+
+        ### Acceptance Criteria
+        - Handle FileNotFoundError, PermissionError, JSONDecodeError
+        - Return a Result type (success value or error)
+        - Log errors with structlog
+        - Support optional schema validation
+
+        ## Implementation Plan
+        Implement with try/except blocks and a Result dataclass.
+    assert:
+      - type: contains
+        value: "def "
+      - type: javascript
+        value: "output.includes('try') || output.includes('except') || output.includes('Error')"
+      - type: javascript
+        value: "output.includes('json') || output.includes('JSON')"
+
+defaultTest:
+  vars:
+    task: "{{task}}"
+  metadata:
+    source: "services/coding-agent/src/coding_agent/context_builder.py"
+
+scenarios:
+  - config:
+      - prompt:
+          raw: |-
+            {{prompts.code-generation-system}}
+
+            {{task}}
+
+            ## Output Format
+            For each file you create or modify, output a fenced code block with the relative file path as a comment on the first line.
+            Example:
+            ```python
+            # path/to/file.py
+            ...
+            ```

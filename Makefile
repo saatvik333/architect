@@ -1,5 +1,5 @@
 
-.PHONY: install lint format typecheck test test-integration test-e2e infra-up infra-down migrate dev clean
+.PHONY: install lint format typecheck test test-integration test-e2e infra-up infra-down migrate dev clean promptfoo-test promptfoo-view
 
 install:
 	uv sync --all-packages --group dev
@@ -45,3 +45,9 @@ clean:
 	find . -type d -name .mypy_cache -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name .ruff_cache -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+
+promptfoo-test:
+	cd promptfoo && bun run test
+
+promptfoo-view:
+	cd promptfoo && bun run test:view

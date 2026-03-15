@@ -1,0 +1,20 @@
+# ARCHITECT Prompt Regression Tests
+# Main configuration file that references all test suites.
+#
+# Usage:
+#   bun run test                          — run all suites
+#   bun run test:suite suites/spec-parsing.yaml  — run one suite
+
+description: "ARCHITECT Prompt Regression Tests"
+
+prompts:
+  - file://suites/spec-parsing.yaml
+  - file://suites/code-generation.yaml
+  - file://suites/adversarial-generation.yaml
+  - file://suites/stakeholder-simulation.yaml
+
+providers:
+  - id: anthropic:messages:claude-sonnet-4-20250514
+    config:
+      max_tokens: 4096
+      temperature: 0.1
