@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -107,6 +107,26 @@ async def health_check() -> HealthResponse:
     return HealthResponse(status=overall, services=services)
 
 
+@app.get("/api/v1/health")
+async def health_check_prefixed() -> HealthResponse:
+    """Health check at /api/v1/health — alias for /health."""
+    return await health_check()
+
+
+@app.get("/api/v1/tasks")
+async def list_tasks(
+    status: str | None = None,
+    task_type: str | None = Query(None, alias="type"),
+) -> list[dict[str, Any]]:
+    """List all tasks, optionally filtered by status or type."""
+    params: dict[str, str] = {}
+    if status is not None:
+        params["status"] = status
+    if task_type is not None:
+        params["type"] = task_type
+    return await _client.list_tasks(params)
+
+
 @app.post("/api/v1/tasks")
 async def create_task(payload: TaskSubmitRequest) -> TaskSubmitResponse:
     """Submit a new task specification."""
@@ -139,6 +159,16 @@ async def cancel_task(task_id: str, body: CancelRequest | None = None) -> dict[s
 async def get_task_proposals(task_id: str) -> list[dict[str, Any]]:
     """Retrieve proposals for a task."""
     return await _client.get_proposals(task_id)
+
+
+@app.get("/api/v1/proposals")
+async def list_proposals(task_id: str | None = None) -> list[dict[str, Any]]:
+    """List proposals, optionally filtered by task_id."""
+    if task_id is not None:
+        return await _client.get_proposals(task_id)
+    # Without task_id filter, query the world-state events endpoint
+    # for proposal-related events
+    return await _client.list_proposals()
 
 
 @app.get("/api/v1/proposals/{proposal_id}")

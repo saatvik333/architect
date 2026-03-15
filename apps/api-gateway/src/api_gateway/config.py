@@ -14,11 +14,11 @@ class GatewayConfig(BaseSettings):
     port: int = 8000
 
     # Backend service URLs — Phase 1
-    task_graph_url: str = "http://localhost:8001"
-    world_state_url: str = "http://localhost:8002"
-    sandbox_url: str = "http://localhost:8003"
-    eval_engine_url: str = "http://localhost:8004"
-    coding_agent_url: str = "http://localhost:8005"
+    task_graph_url: str = "http://localhost:8003"
+    world_state_url: str = "http://localhost:8001"
+    sandbox_url: str = "http://localhost:8007"
+    eval_engine_url: str = "http://localhost:8008"
+    coding_agent_url: str = "http://localhost:8009"
 
     # Backend service URLs — Phase 2
     spec_engine_url: str = "http://localhost:8010"

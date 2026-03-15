@@ -8,16 +8,19 @@ from architect_common.enums import EvalVerdict, EventType
 from architect_common.logging import get_logger
 from architect_common.types import TaskId, utcnow
 from architect_events.schemas import EvalCompletedEvent, EventEnvelope
+from evaluation_engine.layers.adversarial import AdversarialLayer
 from evaluation_engine.layers.architecture import ArchitectureComplianceLayer
 from evaluation_engine.layers.base import EvalLayerBase
 from evaluation_engine.layers.compilation import CompilationLayer
 from evaluation_engine.layers.integration_tests import IntegrationTestLayer
 from evaluation_engine.layers.regression import RegressionLayer
+from evaluation_engine.layers.spec_compliance import SpecComplianceLayer
 from evaluation_engine.layers.unit_tests import UnitTestLayer
 from evaluation_engine.models import EvaluationReport, LayerEvaluation
 
 if TYPE_CHECKING:
     from architect_events.publisher import EventPublisher
+    from architect_llm.client import LLMClient
     from architect_sandbox_client.client import SandboxClient
 
 logger = get_logger(component="evaluation_engine.evaluator")
@@ -37,25 +40,28 @@ class Evaluator:
         event_publisher: EventPublisher,
         layers: list[EvalLayerBase] | None = None,
         *,
+        llm_client: LLMClient | None = None,
+        acceptance_criteria: list[str] | None = None,
         fail_fast: bool = True,
     ) -> None:
         self._sandbox_client = sandbox_client
         self._event_publisher = event_publisher
         self._fail_fast = fail_fast
 
-        # Default layer stack: compilation, unit tests, then new layers
         if layers is not None:
             self._layers = layers
         else:
-            self._layers = [
+            default_layers: list[EvalLayerBase] = [
                 CompilationLayer(sandbox_client),
                 UnitTestLayer(sandbox_client),
                 IntegrationTestLayer(sandbox_client),
-                ArchitectureComplianceLayer(sandbox_client),
-                RegressionLayer(sandbox_client),
             ]
-            # Note: AdversarialLayer and SpecComplianceLayer need extra deps
-            # (LLMClient and acceptance_criteria respectively). Add when available.
+            if llm_client is not None:
+                default_layers.append(AdversarialLayer(sandbox_client, llm_client))
+            default_layers.append(SpecComplianceLayer(sandbox_client, acceptance_criteria))
+            default_layers.append(ArchitectureComplianceLayer(sandbox_client))
+            default_layers.append(RegressionLayer(sandbox_client))
+            self._layers = default_layers
 
     async def evaluate(
         self,
@@ -111,19 +117,17 @@ class Evaluator:
                 )
                 break
 
-        # Reconstruct the report with all layer results (frozen model)
-        report = EvaluationReport(
+        # Compute overall verdict from layer results, then build the final report
+        temp = EvaluationReport(
             task_id=task_id,
             layers=layer_results,
-            overall_verdict=EvalVerdict.PASS,  # placeholder
+            overall_verdict=EvalVerdict.PASS,
             created_at=report.created_at,
         )
-        overall = report.compute_overall_verdict()
-        # Reconstruct with correct overall verdict
         report = EvaluationReport(
             task_id=task_id,
             layers=layer_results,
-            overall_verdict=overall,
+            overall_verdict=temp.compute_overall_verdict(),
             created_at=report.created_at,
         )
 
@@ -133,7 +137,7 @@ class Evaluator:
         logger.info(
             "evaluation complete",
             task_id=str(task_id),
-            overall_verdict=overall,
+            overall_verdict=report.overall_verdict,
             layers_run=len(layer_results),
         )
 

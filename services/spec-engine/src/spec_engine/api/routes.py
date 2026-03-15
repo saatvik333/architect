@@ -18,7 +18,7 @@ from spec_engine.validator import SpecValidator
 
 router = APIRouter()
 
-# ── In-memory spec store (production would use a database) ─────────────
+# ── Spec store — in-memory for Phase 2, to be replaced with Postgres in Phase 3 ──
 _spec_store: dict[str, dict[str, Any]] = {}
 
 _validator = SpecValidator()
@@ -128,15 +128,15 @@ async def clarify_spec(
     validation_issues: list[str] = []
 
     if result.spec is not None:
-        validation_issues = _validator.validate(result.spec)
-        # Update the store with the new result
-        _spec_store[result.spec.id] = {
+        # Preserve the original spec ID — the LLM may generate a new one,
+        # but clients reference this spec by the original URL path ID.
+        spec = result.spec.model_copy(update={"id": spec_id})
+        result = result.model_copy(update={"spec": spec})
+        validation_issues = _validator.validate(spec)
+        _spec_store[spec_id] = {
             "result": result.model_dump(mode="json"),
             "raw_text": raw_text,
         }
-        # Remove the old entry if the ID changed
-        if result.spec.id != spec_id:
-            _spec_store.pop(spec_id, None)
 
     return SpecResponse(
         result=result.model_dump(mode="json"),

@@ -100,6 +100,16 @@ class ServiceClient:
     async def get_world_state(self) -> dict[str, Any]:
         return await self._request("world-state", "GET", "/api/v1/state")
 
+    async def list_tasks(self, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        return await self._request(  # type: ignore[return-value]
+            "task-graph", "GET", "/tasks", params=params
+        )
+
+    async def list_proposals(self, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        return await self._request(  # type: ignore[return-value]
+            "world-state", "GET", "/events", params=params
+        )
+
     async def get_service_health(self, service: str) -> dict[str, Any]:
         return await self._request(service, "GET", "/health")
 

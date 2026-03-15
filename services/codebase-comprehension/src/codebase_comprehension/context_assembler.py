@@ -10,8 +10,10 @@ import pathlib
 
 import structlog
 
+from codebase_comprehension.embeddings import EmbeddingGenerator
 from codebase_comprehension.index_store import IndexStore
 from codebase_comprehension.models import CodeContext, SymbolInfo
+from codebase_comprehension.vector_store import VectorStore
 
 logger = structlog.get_logger()
 
@@ -27,8 +29,8 @@ class ContextAssembler:
     def __init__(
         self,
         index_store: IndexStore,
-        vector_store: object | None = None,
-        embedding_generator: object | None = None,
+        vector_store: VectorStore | None = None,
+        embedding_generator: EmbeddingGenerator | None = None,
     ) -> None:
         self._index_store = index_store
         self._vector_store = vector_store
@@ -76,12 +78,8 @@ class ContextAssembler:
         Falls back to keyword matching if vector store is unavailable or has
         no embeddings for the root path.
         """
-        # Import here to avoid circular imports at module level
-        from codebase_comprehension.embeddings import EmbeddingGenerator
-        from codebase_comprehension.vector_store import VectorStore
-
-        vs: VectorStore | None = self._vector_store  # type: ignore[assignment]
-        eg: EmbeddingGenerator | None = self._embedding_generator  # type: ignore[assignment]
+        vs = self._vector_store
+        eg = self._embedding_generator
 
         if vs is not None and eg is not None:
             try:

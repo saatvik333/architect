@@ -6,6 +6,7 @@ from architect_db.repositories.evaluation_repo import EvaluationReportRepository
 from architect_db.repositories.event_repo import EventRepository
 from architect_db.repositories.proposal_repo import ProposalRepository
 from architect_db.repositories.sandbox_repo import SandboxSessionRepository
+from architect_db.repositories.spec_repo import SpecificationRepository
 from architect_db.repositories.task_repo import TaskRepository
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "EventRepository",
     "ProposalRepository",
     "SandboxSessionRepository",
+    "SpecificationRepository",
     "TaskRepository",
 ]

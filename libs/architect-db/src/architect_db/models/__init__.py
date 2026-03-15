@@ -7,6 +7,7 @@ from architect_db.models.event import EventLog
 from architect_db.models.ledger import WorldStateLedger
 from architect_db.models.proposal import Proposal
 from architect_db.models.sandbox import SandboxAuditLog, SandboxSession
+from architect_db.models.spec import Specification
 from architect_db.models.task import Task
 
 __all__ = [
@@ -17,6 +18,7 @@ __all__ = [
     "Proposal",
     "SandboxAuditLog",
     "SandboxSession",
+    "Specification",
     "Task",
     "TimestampMixin",
     "UUIDPrimaryKeyMixin",
