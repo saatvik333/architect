@@ -8,6 +8,20 @@ repos:
 
   - repo: local
     hooks:
+      - id: mypy
+        name: mypy (typecheck)
+        entry: uv run mypy libs/ services/ apps/
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-push]
+      - id: bandit
+        name: bandit (SAST)
+        entry: uv run bandit -r libs/ services/ apps/ -ll --exclude "tests,*/tests" -q
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-push]
       - id: pytest
         name: pytest (unit)
         entry: uv run pytest libs/ services/ apps/ -x -q
