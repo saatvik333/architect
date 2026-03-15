@@ -15,7 +15,7 @@ from codebase_comprehension.models import CodeChunk, EmbeddingResult
 logger = structlog.get_logger()
 
 try:
-    from pgvector.sqlalchemy import Vector
+    from pgvector.sqlalchemy import Vector  # type: ignore[import-untyped]
 
     _HAS_PGVECTOR = True
 except ImportError:
