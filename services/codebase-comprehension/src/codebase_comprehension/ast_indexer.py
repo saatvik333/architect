@@ -53,7 +53,13 @@ class ASTIndexer:
         max_files: int = 10000,
     ) -> CodebaseIndex:
         """Walk *directory*, read each ``.py`` file, and build a :class:`CodebaseIndex`."""
-        root = pathlib.Path(directory)
+        root = pathlib.Path(directory).resolve()
+        if not root.is_dir():
+            raise ValueError(f"Not a directory: {directory}")
+        # Reject patterns that could escape the root via absolute paths or traversal.
+        if pathlib.PurePosixPath(glob_pattern).is_absolute() or ".." in glob_pattern:
+            raise ValueError(f"Invalid glob pattern: {glob_pattern}")
+
         files: dict[str, FileIndex] = {}
         total_symbols = 0
 

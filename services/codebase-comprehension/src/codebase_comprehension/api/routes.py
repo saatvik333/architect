@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+import pathlib
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from architect_common.enums import HealthStatus
@@ -25,6 +27,14 @@ from codebase_comprehension.models import (
 )
 
 router = APIRouter()
+
+
+def _resolve_safe_directory(directory: str) -> pathlib.Path:
+    """Resolve *directory* to an absolute path and verify it is an existing directory."""
+    resolved = pathlib.Path(directory).resolve()
+    if not resolved.is_dir():
+        raise HTTPException(status_code=400, detail=f"Not a directory: {directory}")
+    return resolved
 
 
 # -- Request / Response schemas ---------------------------------------------
@@ -104,6 +114,7 @@ async def index_directory(
     store: IndexStore = Depends(get_index_store),
 ) -> IndexResponse:
     """Index a directory and store the result."""
+    _resolve_safe_directory(body.directory)
     config = get_config()
     index = indexer.index_directory(
         body.directory,
@@ -121,14 +132,12 @@ async def index_directory(
 @router.post("/api/v1/index/embed", response_model=EmbedResponse)
 async def embed_index(body: EmbedRequest) -> EmbedResponse:
     """Generate embeddings for an indexed codebase and store in pgvector."""
-    import pathlib
-
     from codebase_comprehension.chunker import SemanticChunker
     from codebase_comprehension.embeddings import EmbeddingGenerator
     from codebase_comprehension.tree_sitter_indexer import TreeSitterIndexer
     from codebase_comprehension.vector_store import VectorStore
 
-    root = pathlib.Path(body.directory)
+    root = _resolve_safe_directory(body.directory)
     indexer = TreeSitterIndexer()
     chunker = SemanticChunker()
 

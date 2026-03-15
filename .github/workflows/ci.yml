@@ -17,6 +17,9 @@ on:
       - "SECURITY.md"
       - ".github/ISSUE_TEMPLATE/**"
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest

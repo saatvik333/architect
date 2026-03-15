@@ -1,5 +1,7 @@
 """Tests for configuration schema."""
 
+from urllib.parse import urlparse
+
 from architect_common.config import ArchitectConfig, PostgresConfig, RedisConfig
 
 
@@ -9,15 +11,16 @@ def test_postgres_dsn() -> None:
         port=5432,
         database="test_db",
         user="test_user",
-        password="secret",  # type: ignore[arg-type]
+        password="secret",
     )
-    assert "db.example.com" in cfg.dsn
-    assert "test_db" in cfg.dsn
-    assert "test_user" in cfg.dsn
+    parsed = urlparse(cfg.dsn)
+    assert parsed.hostname == "db.example.com"
+    assert parsed.path == "/test_db"
+    assert parsed.username == "test_user"
 
 
 def test_redis_url_no_password() -> None:
-    cfg = RedisConfig(host="localhost", port=6379, db=0, password="")  # type: ignore[arg-type]
+    cfg = RedisConfig(host="localhost", port=6379, db=0, password="")
     assert cfg.url == "redis://localhost:6379/0"
 
 
