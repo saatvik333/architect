@@ -94,12 +94,9 @@ run-all: infra-up migrate run-services run-gateway run-dashboard
 
 stop-all:
 	@echo "Stopping services..."
-	@for f in $(PID_DIR)/*.pid; do \
-		if [ -f "$$f" ]; then \
-			kill $$(cat "$$f") 2>/dev/null || true; \
-			rm -f "$$f"; \
-		fi; \
-	done
+	@-lsof -ti :8001,:8003,:8007,:8008,:8009,:8010,:8011,:8012,:8013,:8000 2>/dev/null | xargs kill 2>/dev/null || true
+	@-lsof -ti :3000 2>/dev/null | xargs kill 2>/dev/null || true
+	@rm -f $(PID_DIR)/*.pid 2>/dev/null || true
 	@echo "Stopping infrastructure..."
 	docker compose -f infra/docker-compose.yml down
 	@echo "All stopped."

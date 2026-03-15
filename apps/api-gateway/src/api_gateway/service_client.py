@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 import httpx
 
 from api_gateway.config import GatewayConfig
+from architect_common.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(component="api_gateway.service_client")
 
 _SERVICE_URL_MAP = {
     "task-graph": "task_graph_url",

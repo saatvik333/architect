@@ -98,6 +98,9 @@ def create_app(config: WorldStateLedgerConfig | None = None) -> FastAPI:
     return app
 
 
+app = create_app()
+
+
 def main() -> None:
     """CLI entry point — create the app and run it with uvicorn."""
     config = WorldStateLedgerConfig()

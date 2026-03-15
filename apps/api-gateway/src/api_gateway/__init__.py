@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -24,8 +23,9 @@ from api_gateway.models import (
     WorldStateResponse,
 )
 from api_gateway.service_client import ServiceClient
+from architect_common.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(component="api_gateway")
 
 _config = GatewayConfig()
 _client = ServiceClient(_config)
@@ -70,7 +70,7 @@ async def http_status_error_handler(_request: Request, exc: httpx.HTTPStatusErro
 @app.exception_handler(httpx.ConnectError)
 async def connect_error_handler(_request: Request, exc: httpx.ConnectError) -> JSONResponse:
     """Return 502 when a backend service is unreachable."""
-    logger.error("Backend service unavailable: %s", exc)
+    logger.error("backend service unavailable", error=str(exc))
     return JSONResponse(
         status_code=502,
         content={"detail": "Backend service unavailable"},

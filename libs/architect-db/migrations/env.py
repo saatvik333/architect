@@ -27,7 +27,10 @@ def get_url() -> str:
     """Resolve the database URL, preferring the environment variable."""
     return os.environ.get(
         "ARCHITECT_DATABASE_URL",
-        config.get_main_option("sqlalchemy.url", "postgresql+asyncpg://localhost:5432/architect"),
+        config.get_main_option(
+            "sqlalchemy.url",
+            "postgresql+asyncpg://architect:architect_dev@localhost:5432/architect",
+        ),
     )
 
 

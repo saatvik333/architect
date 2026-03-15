@@ -16,7 +16,7 @@ class PostgresConfig(BaseSettings):
     port: int = Field(default=5432, ge=1, le=65535)
     database: str = "architect"
     user: str = "architect"
-    password: SecretStr = SecretStr("")
+    password: SecretStr = SecretStr("architect_dev")
     pool_min: int = Field(default=2, ge=1)
     pool_max: int = Field(default=10, ge=1)
 
