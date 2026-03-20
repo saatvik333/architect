@@ -5,7 +5,7 @@ Loaded from environment variables using pydantic-settings.
 
 from __future__ import annotations
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,7 +16,17 @@ class PostgresConfig(BaseSettings):
     port: int = Field(default=5432, ge=1, le=65535)
     database: str = "architect"
     user: str = "architect"
-    password: SecretStr = SecretStr("architect_dev")
+    password: SecretStr
+
+    @field_validator("password", mode="before")
+    @classmethod
+    def _password_must_be_set(cls, v: str | SecretStr) -> str | SecretStr:
+        raw = v.get_secret_value() if isinstance(v, SecretStr) else v
+        if not raw:
+            msg = "ARCHITECT_PG_PASSWORD must be set (use scripts/dev-setup.sh to generate)"
+            raise ValueError(msg)
+        return v
+
     pool_size: int = Field(default=5, ge=1)
     max_overflow: int = Field(default=5, ge=0)
     pool_recycle: int = Field(default=3600, ge=0)
@@ -68,6 +78,7 @@ class SandboxConfig(BaseSettings):
     disk_mb: int = Field(default=10240, ge=1024, le=20480)
     timeout_minutes: int = Field(default=15, ge=1, le=60)
     docker_socket: str = "/var/run/docker.sock"
+    docker_host: str = ""  # e.g. tcp://docker-socket-proxy:2375
 
 
 class ClaudeConfig(BaseSettings):

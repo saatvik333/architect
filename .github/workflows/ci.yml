@@ -56,6 +56,8 @@ jobs:
           cache-dependency-glob: "uv.lock"
       - run: uv sync --all-packages --group dev --locked
       - run: uv run pytest libs/ services/ apps/ -x -q --tb=short --cov=libs --cov=services --cov=apps --cov-report=xml --cov-fail-under=60
+        env:
+          ARCHITECT_PG_PASSWORD: ci_test_password
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
@@ -96,7 +98,7 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_USER: architect
-          POSTGRES_PASSWORD: architect_dev
+          POSTGRES_PASSWORD: ci_test_password
           POSTGRES_DB: architect
         ports:
           - 5432:5432
@@ -116,4 +118,5 @@ jobs:
       - run: uv run pytest tests/integration/ -m integration -x -q --tb=short
         env:
           ARCHITECT_PG_HOST: localhost
+          ARCHITECT_PG_PASSWORD: ci_test_password
           ARCHITECT_REDIS_HOST: localhost

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import redis.asyncio as aioredis
 
 from architect_common.logging import get_logger
@@ -9,6 +11,13 @@ from architect_events.schemas import EventEnvelope
 from architect_events.serialization import serialize_event
 
 logger = get_logger(component="architect_events.publisher")
+
+_REDACT_RE = re.compile(r"(://:[^@]+@)")
+
+
+def _redact_url(url: str) -> str:
+    """Replace password in a Redis URL with '***'."""
+    return _REDACT_RE.sub("://:***@", url)
 
 
 class EventPublisher:
@@ -29,7 +38,7 @@ class EventPublisher:
             self._redis_url,
             decode_responses=False,
         )
-        logger.info("EventPublisher connected", redis_url=self._redis_url)
+        logger.info("EventPublisher connected", redis_url=_redact_url(self._redis_url))
 
     def _stream_name(self, event: EventEnvelope) -> str:
         return f"{self._stream_prefix}:{event.type}"

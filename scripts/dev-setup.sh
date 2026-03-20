@@ -46,11 +46,28 @@ info "Syncing workspace dependencies..."
 uv sync --all-packages --group dev
 ok "Dependencies synced."
 
-# ── Step 3: Copy .env if not present ───────────────────────────────────────────
+# ── Step 3: Generate .env with secure credentials ────────────────────────────
 if [ ! -f .env ]; then
     if [ -f .env.example ]; then
         cp .env.example .env
-        ok "Created .env from .env.example"
+
+        # Auto-generate strong passwords
+        PG_PASS="$(openssl rand -hex 16)"
+        REDIS_PASS="$(openssl rand -hex 16)"
+
+        # Portable in-place sed (works on macOS and Linux)
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            SED_I=(sed -i '')
+        else
+            SED_I=(sed -i)
+        fi
+
+        "${SED_I[@]}" "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${PG_PASS}|" .env
+        "${SED_I[@]}" "s|^ARCHITECT_PG_PASSWORD=.*|ARCHITECT_PG_PASSWORD=${PG_PASS}|" .env
+        "${SED_I[@]}" "s|^REDIS_PASSWORD=.*|REDIS_PASSWORD=${REDIS_PASS}|" .env
+        "${SED_I[@]}" "s|^ARCHITECT_REDIS_PASSWORD=.*|ARCHITECT_REDIS_PASSWORD=${REDIS_PASS}|" .env
+
+        ok "Created .env with auto-generated credentials."
     else
         warn "No .env.example found; skipping .env creation."
     fi

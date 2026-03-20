@@ -8,8 +8,11 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from api_gateway import app, get_client
+from api_gateway import RateLimitMiddleware, app, get_client, get_config
+from api_gateway.config import GatewayConfig
 from api_gateway.service_client import ServiceClient
+
+_TEST_API_KEY = "test-key-abcdef1234567890abcdef1234567890"
 
 
 @pytest.fixture
@@ -19,11 +22,95 @@ def mock_client() -> AsyncMock:
 
 
 @pytest.fixture
-def client(mock_client: AsyncMock) -> TestClient:
-    """FastAPI TestClient with mocked ServiceClient."""
+def _auth_config(monkeypatch: pytest.MonkeyPatch) -> GatewayConfig:
+    """Override gateway config with auth enabled and a known key."""
+    monkeypatch.setenv("ARCHITECT_GATEWAY_API_KEYS_RAW", _TEST_API_KEY)
+    monkeypatch.setenv("ARCHITECT_GATEWAY_AUTH_ENABLED", "true")
+    get_config.cache_clear()
+    cfg = get_config()
+    yield cfg  # type: ignore[misc]
+    get_config.cache_clear()
+
+
+@pytest.fixture
+def _noauth_config(monkeypatch: pytest.MonkeyPatch) -> GatewayConfig:
+    """Override gateway config with auth disabled for route-logic tests."""
+    monkeypatch.setenv("ARCHITECT_GATEWAY_AUTH_ENABLED", "false")
+    monkeypatch.delenv("ARCHITECT_GATEWAY_API_KEYS_RAW", raising=False)
+    get_config.cache_clear()
+    cfg = get_config()
+    yield cfg  # type: ignore[misc]
+    get_config.cache_clear()
+
+
+@pytest.fixture
+def client(mock_client: AsyncMock, _noauth_config: GatewayConfig) -> TestClient:
+    """FastAPI TestClient with mocked ServiceClient and auth disabled."""
     app.dependency_overrides[get_client] = lambda: mock_client
     yield TestClient(app, raise_server_exceptions=False)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def auth_client(mock_client: AsyncMock, _auth_config: GatewayConfig) -> TestClient:
+    """FastAPI TestClient with auth enabled and a known API key."""
+    app.dependency_overrides[get_client] = lambda: mock_client
+    yield TestClient(app, raise_server_exceptions=False)
+    app.dependency_overrides.clear()
+
+
+# ── Authentication ──────────────────────────────────────────────────
+
+
+class TestAuthentication:
+    def test_missing_auth_header_returns_401(self, auth_client: TestClient) -> None:
+        resp = auth_client.get("/api/v1/tasks")
+        assert resp.status_code == 401
+        assert "API key" in resp.json()["detail"]
+
+    def test_invalid_key_returns_401(self, auth_client: TestClient) -> None:
+        resp = auth_client.get(
+            "/api/v1/tasks",
+            headers={"Authorization": "Bearer wrong-key"},
+        )
+        assert resp.status_code == 401
+
+    def test_valid_key_passes(self, auth_client: TestClient, mock_client: AsyncMock) -> None:
+        mock_client.list_tasks.return_value = {"tasks": [], "total": 0}
+        resp = auth_client.get(
+            "/api/v1/tasks",
+            headers={"Authorization": f"Bearer {_TEST_API_KEY}"},
+        )
+        assert resp.status_code == 200
+
+    def test_health_no_auth_required(self, auth_client: TestClient, mock_client: AsyncMock) -> None:
+        mock_client.get_service_health.return_value = {"status": "healthy"}
+        resp = auth_client.get("/health")
+        assert resp.status_code == 200
+
+    def test_api_v1_health_no_auth_required(
+        self, auth_client: TestClient, mock_client: AsyncMock
+    ) -> None:
+        mock_client.get_service_health.return_value = {"status": "healthy"}
+        resp = auth_client.get("/api/v1/health")
+        assert resp.status_code == 200
+
+    def test_options_no_auth_required(self, auth_client: TestClient) -> None:
+        resp = auth_client.options("/api/v1/tasks")
+        # CORS preflight should not be blocked by auth
+        assert resp.status_code != 401
+
+    def test_auth_disabled_allows_all(self, client: TestClient, mock_client: AsyncMock) -> None:
+        mock_client.list_tasks.return_value = {"tasks": [], "total": 0}
+        resp = client.get("/api/v1/tasks")
+        assert resp.status_code == 200
+
+    def test_malformed_auth_header_returns_401(self, auth_client: TestClient) -> None:
+        resp = auth_client.get(
+            "/api/v1/tasks",
+            headers={"Authorization": "Basic dXNlcjpwYXNz"},
+        )
+        assert resp.status_code == 401
 
 
 # ── Health ───────────────────────────────────────────────────────────
@@ -61,7 +148,6 @@ class TestHealth:
 
 class TestCreateTask:
     def test_create_task_success(self, client: TestClient, mock_client: AsyncMock) -> None:
-        # Mock returns task-graph-engine's SubmitSpecResponse format
         mock_client.submit_task.return_value = {
             "task_count": 1,
             "task_ids": ["task-abc"],
@@ -83,7 +169,6 @@ class TestCreateTask:
 
 class TestGetTask:
     def test_get_task_success(self, client: TestClient, mock_client: AsyncMock) -> None:
-        # Mock returns task-graph-engine's TaskResponse format
         mock_client.get_task_status.return_value = {
             "id": "task-abc",
             "description": "Test",
@@ -190,3 +275,116 @@ class TestErrorHandling:
         resp = client.get("/api/v1/state")
         assert resp.status_code == 502
         assert "unavailable" in resp.json()["detail"].lower()
+
+
+# ── Security Headers ─────────────────────────────────────────────────
+
+
+class TestSecurityHeaders:
+    def test_security_headers_present(self, client: TestClient, mock_client: AsyncMock) -> None:
+        mock_client.get_service_health.return_value = {"status": "healthy"}
+        resp = client.get("/health")
+        assert resp.headers["X-Content-Type-Options"] == "nosniff"
+        assert resp.headers["X-Frame-Options"] == "DENY"
+        assert "Content-Security-Policy" in resp.headers
+
+    def test_no_hsts_in_dev(self, client: TestClient, mock_client: AsyncMock) -> None:
+        mock_client.get_service_health.return_value = {"status": "healthy"}
+        resp = client.get("/health")
+        assert "Strict-Transport-Security" not in resp.headers
+
+    def test_hsts_in_production(
+        self,
+        mock_client: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("ARCHITECT_GATEWAY_AUTH_ENABLED", "false")
+        monkeypatch.setenv("ARCHITECT_GATEWAY_ENVIRONMENT", "production")
+        get_config.cache_clear()
+        try:
+            c = TestClient(app, raise_server_exceptions=False)
+            app.dependency_overrides[get_client] = lambda: mock_client
+            mock_client.get_service_health.return_value = {"status": "healthy"}
+            resp = c.get("/health")
+            assert resp.headers.get("Strict-Transport-Security") == "max-age=31536000"
+        finally:
+            get_config.cache_clear()
+            app.dependency_overrides.clear()
+
+
+# ── Rate Limiting ────────────────────────────────────────────────────
+
+
+class TestRateLimiting:
+    def test_rate_limit_exceeded(
+        self,
+        mock_client: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        RateLimitMiddleware.reset()
+        monkeypatch.setenv("ARCHITECT_GATEWAY_AUTH_ENABLED", "false")
+        monkeypatch.setenv("ARCHITECT_GATEWAY_RATE_LIMIT_PER_MINUTE", "3")
+        get_config.cache_clear()
+        try:
+            c = TestClient(app, raise_server_exceptions=False)
+            app.dependency_overrides[get_client] = lambda: mock_client
+            mock_client.list_tasks.return_value = {"tasks": [], "total": 0}
+
+            for _ in range(3):
+                resp = c.get("/api/v1/tasks")
+                assert resp.status_code == 200
+
+            resp = c.get("/api/v1/tasks")
+            assert resp.status_code == 429
+            assert "Retry-After" in resp.headers
+        finally:
+            RateLimitMiddleware.reset()
+            get_config.cache_clear()
+            app.dependency_overrides.clear()
+
+    def test_health_exempt_from_rate_limit(
+        self,
+        mock_client: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        RateLimitMiddleware.reset()
+        monkeypatch.setenv("ARCHITECT_GATEWAY_AUTH_ENABLED", "false")
+        monkeypatch.setenv("ARCHITECT_GATEWAY_RATE_LIMIT_PER_MINUTE", "2")
+        get_config.cache_clear()
+        try:
+            c = TestClient(app, raise_server_exceptions=False)
+            app.dependency_overrides[get_client] = lambda: mock_client
+            mock_client.get_service_health.return_value = {"status": "healthy"}
+
+            for _ in range(10):
+                resp = c.get("/health")
+                assert resp.status_code == 200
+        finally:
+            RateLimitMiddleware.reset()
+            get_config.cache_clear()
+            app.dependency_overrides.clear()
+
+
+# ── Request Size Limit ───────────────────────────────────────────────
+
+
+class TestRequestSizeLimit:
+    def test_oversized_request_returns_413(
+        self,
+        mock_client: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("ARCHITECT_GATEWAY_AUTH_ENABLED", "false")
+        monkeypatch.setenv("ARCHITECT_GATEWAY_MAX_REQUEST_BODY_BYTES", "100")
+        get_config.cache_clear()
+        try:
+            c = TestClient(app, raise_server_exceptions=False)
+            app.dependency_overrides[get_client] = lambda: mock_client
+            resp = c.post(
+                "/api/v1/tasks",
+                json={"name": "x" * 200, "description": "y" * 200},
+            )
+            assert resp.status_code == 413
+        finally:
+            get_config.cache_clear()
+            app.dependency_overrides.clear()

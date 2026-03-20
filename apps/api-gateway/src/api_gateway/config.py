@@ -29,7 +29,22 @@ class GatewayConfig(BaseSettings):
     # CORS
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    # Authentication — comma-separated string, split in property
+    api_keys_raw: str = ""
+    auth_enabled: bool = True
+
+    @property
+    def api_keys(self) -> list[str]:
+        """Split comma-separated API keys string into a list."""
+        if not self.api_keys_raw:
+            return []
+        return [k.strip() for k in self.api_keys_raw.split(",") if k.strip()]
+
     # Rate limiting
-    # TODO: rate_limit_per_minute is defined but not yet wired to middleware.
-    # Integrate with a rate-limiting middleware (e.g. slowapi) to enforce this.
     rate_limit_per_minute: int = 60
+
+    # Request body size limit (bytes)
+    max_request_body_bytes: int = 1_048_576  # 1 MB
+
+    # Environment (controls HSTS — only non-dev)
+    environment: str = "dev"

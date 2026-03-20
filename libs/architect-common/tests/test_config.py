@@ -2,6 +2,9 @@
 
 from urllib.parse import urlparse
 
+import pytest
+from pydantic import ValidationError
+
 from architect_common.config import ArchitectConfig, PostgresConfig, RedisConfig
 
 
@@ -19,12 +22,20 @@ def test_postgres_dsn() -> None:
     assert parsed.username == "test_user"
 
 
+def test_postgres_password_required(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PostgresConfig must reject empty or missing password."""
+    monkeypatch.delenv("ARCHITECT_PG_PASSWORD", raising=False)
+    with pytest.raises(ValidationError, match="ARCHITECT_PG_PASSWORD must be set"):
+        PostgresConfig(password="")
+
+
 def test_redis_url_no_password() -> None:
     cfg = RedisConfig(host="localhost", port=6379, db=0, password="")
     assert cfg.url == "redis://localhost:6379/0"
 
 
-def test_default_config_loads() -> None:
+def test_default_config_loads(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ARCHITECT_PG_PASSWORD", "test_password")
     cfg = ArchitectConfig()
     assert cfg.environment == "dev"
     assert cfg.log_level == "INFO"

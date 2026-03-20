@@ -15,7 +15,7 @@ def pg_dsn() -> str:
     host = os.environ.get("ARCHITECT_PG_HOST", "localhost")
     port = os.environ.get("ARCHITECT_PG_PORT", "5432")
     user = os.environ.get("ARCHITECT_PG_USER", "architect")
-    password = os.environ.get("ARCHITECT_PG_PASSWORD", "architect_dev")
+    password = os.environ.get("ARCHITECT_PG_PASSWORD", "test_password")
     db = os.environ.get("ARCHITECT_PG_DB", "architect")
     return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
 
@@ -25,7 +25,9 @@ def redis_url() -> str:
     """Redis connection URL from environment or default."""
     host = os.environ.get("ARCHITECT_REDIS_HOST", "localhost")
     port = os.environ.get("ARCHITECT_REDIS_PORT", "6379")
-    return f"redis://{host}:{port}/0"
+    password = os.environ.get("ARCHITECT_REDIS_PASSWORD", "")
+    auth = f":{password}@" if password else ""
+    return f"redis://{auth}{host}:{port}/0"
 
 
 @pytest.fixture(scope="session")

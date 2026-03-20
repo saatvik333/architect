@@ -16,6 +16,32 @@ if TYPE_CHECKING:
 
 logger = get_logger(component="coding_agent.coder")
 
+# ── Post-generation security scanning ────────────────────────────────
+
+_SUSPICIOUS_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    ("os.system call", re.compile(r"\bos\.system\s*\(")),
+    ("subprocess with shell=True", re.compile(r"subprocess\.\w+\([^)]*shell\s*=\s*True")),
+    ("eval() call", re.compile(r"\beval\s*\(")),
+    ("exec() call", re.compile(r"\bexec\s*\(")),
+    ("__import__('os')", re.compile(r"__import__\s*\(\s*['\"]os['\"]\s*\)")),
+    ("pickle.loads", re.compile(r"pickle\.loads?\s*\(")),
+    ("unsafe yaml.load", re.compile(r"yaml\.load\s*\([^)]*(?!Loader\s*=\s*SafeLoader)")),
+    ("outbound requests.get", re.compile(r"requests\.(get|post|put|delete)\s*\(")),
+    ("urllib request", re.compile(r"urllib\.request\.\w+\s*\(")),
+    ("socket.connect", re.compile(r"socket\.connect\s*\(")),
+]
+
+
+def _scan_generated_code(files: list[GeneratedFile]) -> list[dict[str, str]]:
+    """Scan generated files for suspicious patterns. Returns list of warnings."""
+    warnings: list[dict[str, str]] = []
+    for f in files:
+        for label, pattern in _SUSPICIOUS_PATTERNS:
+            if pattern.search(f.content):
+                warnings.append({"file": f.path, "pattern": label})
+    return warnings
+
+
 # Regex to extract fenced code blocks with optional file-path comments.
 # Matches: ```python\n# path/to/file.py\n<content>\n```
 _CODE_BLOCK_RE = re.compile(
@@ -76,6 +102,14 @@ class CodeGenerator:
         response = await self._llm.generate(request)
 
         files = self._parse_files(response.content)
+
+        # Post-generation security scan
+        scan_warnings = _scan_generated_code(files)
+        if scan_warnings:
+            logger.warning(
+                "suspicious_patterns_in_generated_code",
+                warnings=scan_warnings,
+            )
 
         logger.info(
             "code generated",

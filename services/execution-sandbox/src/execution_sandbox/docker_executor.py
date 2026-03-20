@@ -39,8 +39,9 @@ class DockerExecutor(ExecutorBase):
     Each :class:`SandboxSession` maps to exactly one Docker container.
     """
 
-    def __init__(self, docker_socket: str = "/var/run/docker.sock") -> None:
-        self._client: docker.DockerClient = docker.DockerClient(base_url=f"unix://{docker_socket}")
+    def __init__(self, docker_socket: str = "/var/run/docker.sock", docker_host: str = "") -> None:
+        base_url = docker_host if docker_host else f"unix://{docker_socket}"
+        self._client: docker.DockerClient = docker.DockerClient(base_url=base_url)
         self._sessions: dict[str, SandboxSession] = {}
 
     # ── Lifecycle ────────────────────────────────────────────────────

@@ -1094,7 +1094,7 @@ Generate vector embeddings for an indexed codebase and store them in pgvector fo
 ```json
 {
   "directory": "/path/to/project",
-  "database_url": "postgresql+asyncpg://architect:architect_dev@localhost:5432/architect"
+  "database_url": "postgresql+asyncpg://architect:$ARCHITECT_PG_PASSWORD@localhost:5432/architect"
 }
 ```
 

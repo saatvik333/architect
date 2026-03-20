@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import hmac
+import time
 import uuid as _uuid
+from collections import defaultdict
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import lru_cache
-from typing import Any
+from typing import Any, ClassVar
 
 import httpx
 from fastapi import Depends, FastAPI, Query, Request
@@ -30,6 +33,17 @@ from api_gateway.service_client import ServiceClient
 from architect_common.logging import get_logger
 
 logger = get_logger(component="api_gateway")
+
+# Paths exempt from API key authentication.
+_AUTH_EXEMPT_PATHS = frozenset(
+    {
+        "/health",
+        "/api/v1/health",
+        "/docs",
+        "/openapi.json",
+        "/redoc",
+    }
+)
 
 
 # ── Dependency injection helpers ──────────────────────────────────
@@ -68,7 +82,7 @@ app = FastAPI(
 )
 
 
-# ── Security headers middleware ───────────────────────────────────
+# ── Middleware classes ─────────────────────────────────────────────
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -80,13 +94,127 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=()"
+        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+        # HSTS only in non-dev environments
+        config = get_config()
+        if config.environment != "dev":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000"
         return response
 
 
-app.add_middleware(SecurityHeadersMiddleware)
+class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+    """Reject requests whose ``Content-Length`` exceeds the configured limit."""
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        config = get_config()
+        max_bytes = config.max_request_body_bytes
+        content_length = request.headers.get("content-length")
+        if content_length is not None and int(content_length) > max_bytes:
+            return JSONResponse(
+                status_code=413,
+                content={"detail": f"Request body too large (max {max_bytes} bytes)"},
+            )
+        return await call_next(request)
 
 
-# ── Request ID middleware ─────────────────────────────────────────
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Simple sliding-window rate limiter keyed by client IP.
+
+    Uses an in-memory store suitable for single-instance deployments.
+    """
+
+    # Class-level state so tests can clear it.
+    _windows: ClassVar[dict[str, list[float]]] = defaultdict(list)
+
+    @classmethod
+    def reset(cls) -> None:
+        """Clear all rate limit windows (for testing)."""
+        cls._windows.clear()
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        # Exempt health endpoints from rate limiting
+        if request.url.path in _AUTH_EXEMPT_PATHS:
+            return await call_next(request)
+
+        config = get_config()
+        limit = config.rate_limit_per_minute
+        if limit <= 0:
+            return await call_next(request)
+
+        # Use API key (if present) or client IP as rate limit key
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer ") and len(auth_header) > 7:
+            key = f"key:{auth_header[7:][:16]}"
+        else:
+            key = f"ip:{request.client.host}" if request.client else "ip:unknown"
+
+        now = time.monotonic()
+        window_start = now - 60.0
+
+        # Prune old entries
+        timestamps = self._windows[key]
+        self._windows[key] = [t for t in timestamps if t > window_start]
+        timestamps = self._windows[key]
+
+        if len(timestamps) >= limit:
+            retry_after = int(60 - (now - timestamps[0])) + 1
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Rate limit exceeded"},
+                headers={"Retry-After": str(retry_after)},
+            )
+
+        timestamps.append(now)
+        return await call_next(request)
+
+
+class APIKeyAuthMiddleware(BaseHTTPMiddleware):
+    """Validate ``Authorization: Bearer <key>`` on every non-exempt request.
+
+    Reads config lazily via :func:`get_config` so that test monkeypatches
+    take effect.
+    """
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        config = get_config()
+
+        # Skip auth when disabled
+        if not config.auth_enabled:
+            return await call_next(request)
+
+        # Exempt paths and CORS preflight
+        if request.url.path in _AUTH_EXEMPT_PATHS or request.method == "OPTIONS":
+            return await call_next(request)
+
+        api_keys = config.api_keys
+
+        # No keys configured = open access (development only)
+        if not api_keys:
+            return await call_next(request)
+
+        # Extract Bearer token
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid or missing API key"},
+            )
+
+        token = auth_header[7:]  # len("Bearer ") == 7
+
+        # Constant-time comparison against all configured keys
+        if not any(hmac.compare_digest(token, key) for key in api_keys):
+            logger.warning(
+                "auth_rejected",
+                key_prefix=token[:8] if len(token) >= 8 else "***",
+                path=request.url.path,
+            )
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid or missing API key"},
+            )
+
+        return await call_next(request)
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
@@ -94,22 +222,26 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         request_id = request.headers.get("X-Request-ID") or str(_uuid.uuid4())
-        # Store on request state so downstream code can access it
         request.state.request_id = request_id
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         return response
 
 
+# ── Register middleware ────────────────────────────────────────────
+# Execution order: CORS → RequestID → RateLimit → Auth → SizeLimit → SecurityHeaders → handler
+# Starlette runs outermost-added middleware first, so add in reverse of desired order.
+
+_startup_config = get_config()
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestSizeLimitMiddleware)
+app.add_middleware(APIKeyAuthMiddleware)
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestIDMiddleware)
-
-
-# ── CORS middleware ───────────────────────────────────────────────
-
-_config_for_cors = get_config()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_config_for_cors.cors_origins,
+    allow_origins=_startup_config.cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["Content-Type", "Authorization", "X-Request-ID"],

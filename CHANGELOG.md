@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase A Security Hardening
+- **API key authentication** on all gateway endpoints (ADR-005 accepted) — `Authorization: Bearer <key>` with constant-time `hmac.compare_digest`, exempt health/docs paths (S-C2, CVSS 9.1 → resolved)
+- **Redis authentication** — `--requirepass` in docker-compose, credentials redacted from logs (S-H3, CVSS 7.5 → resolved)
+- **Prompt injection mitigation** — injection marker detection + `<user_input>` delimiter tags in LLM prompts + post-generation code security scan (S-H1, CVSS 8.2 → resolved)
+- **Docker socket proxy** — Tecnativa docker-socket-proxy restricting API surface (S-H5, CVSS 7.8 → resolved)
+- **Rate limiting** — sliding-window rate limiter middleware with 429 + Retry-After (S-M1 → resolved)
+- **Request body size limits** — 1MB default, returns 413 on oversized requests (S-M7 → resolved)
+- **Security headers** — CSP, HSTS (non-dev only), enhanced existing headers (S-M3 → resolved)
+- **Credential auto-generation** — `scripts/dev-setup.sh` generates strong passwords for Postgres and Redis
+- Hardcoded `architect_dev` credentials removed from docker-compose, config, and .env.example (O-H3, S-M2, S-M5 → resolved)
+
+### Fixed
+- Sandbox command filter replaced with allowlist + `shlex.split()` parsing (CVSS 9.8 → resolved)
+- Path validation uses `Path.is_relative_to()` instead of string prefix matching (CVSS 8.6 → resolved)
+- OCC guard with `SELECT ... FOR UPDATE` on state commits (CVSS 8.1 → resolved)
+- CORS restricted to specific methods/headers, security headers middleware added
+- Tar slip vulnerability in sandbox file read — member names validated
+- Environment variable injection blocked for dangerous names (`LD_PRELOAD`, `PYTHONPATH`, etc.)
+- Token usage double-counting bug in Coding Agent (`+=` → `=`)
+- Hardcoded placeholder task/agent IDs in Temporal activities
+- Thundering herd on state cache — probabilistic early expiration + 300s TTL
+- Unbounded `_retry_counts` dict in EventSubscriber — bounded with pruning
+- Module-level `app = create_app()` removed across all 9 services (factory pattern)
+- Inconsistent logging (stdlib → structlog) across events, LLM, and spec-engine libs
+- Redundant mutation traversal deduplicated via shared `_set_at_path()` helper
+- Scheduler race condition prevented with atomic `schedule_and_claim()` under lock
+- Connection pool sizing reduced to 5+5 per service (90 max across 9 services)
+- Security scans (`bandit`, `pip-audit`) now block CI on findings
+- Container images pinned to specific versions (Temporal, NATS, Redis, uv)
+- Release workflow no longer pushes mutable `latest` tag
+- Health check script corrected with actual service ports
+- Port numbers fixed in service-operations runbook and phase-2-design doc
+- Missing gateway routes added to API documentation
+- Stale test/line counts replaced with non-stale phrasing
+
 ### Added
 - `infra/seccomp/sandbox-profile.json` — whitelist-only seccomp profile blocking `ptrace`, `mount`, `unshare`, `CLONE_NEWUSER`, `keyctl`, `syslog`, `pivot_root`, `bpf`, `perf_event_open`, and kernel module operations
 - 4 new DB repositories: `ProposalRepository`, `AgentSessionRepository`, `SandboxSessionRepository`, `EvaluationReportRepository`
@@ -44,6 +79,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API Gateway: proxy routes for all Phase 2 services (specs, routing, codebase indexing, message bus)
 - `nats-py>=2.7` added to agent-comm-bus dependencies
 - `architect-llm` added to evaluation-engine dependencies (for adversarial layer)
+- React `ErrorBoundary` component wrapping entire dashboard
+- `AbortController` in `usePolling` hook — cancels in-flight requests on unmount
+- Lazy-loaded React routes via `React.lazy()` + `Suspense`
+- `ScorerConfig` Pydantic model replacing magic numbers in ComplexityScorer
+- `embed_chunks_async()` method wrapping blocking model.encode in `asyncio.to_thread()`
+- Batched vector store inserts (500 per batch)
+- LRU eviction in IndexStore (max 50 indices)
+- Bounded `_run_store` in coding agent API (max 1000 entries, OrderedDict)
+- `TaskDAG.update_task()` method for proper encapsulation
+- Alembic migration 003: composite indexes on event_log and evaluation_reports FK
+- Coverage threshold enforcement (`--cov-fail-under=60`) in CI and Makefile
+- Pre-push hook installation in dev-setup.sh
+- 5 Phase 1 service route test files (42 tests)
+- Adversarial command filter bypass tests (57 parametrized cases)
+- EventPublisher, EventSubscriber, and rate limiter test suites (54 tests)
 
 ### Changed
 - `SecurityValidator` command blocklist: all patterns now case-insensitive; added full-path variants (`/bin/rm`, `/usr/bin/curl`, etc.); 12 new dangerous patterns (`mknod`, `eval`, `exec`, `LD_PRELOAD`, `/dev/shm`, `find -exec`, `base64 -d`, `/proc/self`, etc.)
@@ -53,6 +103,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docker-compose.yml`: fixed NATS healthcheck (was invalid command); added `deploy.resources.limits` to all 5 services; postgres password now sourced from `${POSTGRES_PASSWORD:-architect_dev}`
 - `LLMClient`: calls `check_budget()` before every API call and before every retry to prevent over-spend
 - Integration CI job now depends on `security` job completing
+- Temporal DI pattern: module-level globals → `@dataclass` activity classes (WSL + coding agent)
+- `compute_overall_verdict` → static method on `EvaluationReport`
+- `EventLog.append()` accepts optional session parameter for transactional composition
+- Task decomposer markdown fence handling uses regex instead of line-based stripping
+- Docker image references in docs corrected to `pgvector/pgvector:pg16`
 
 ## [0.1.0] - 2026-03-13
 

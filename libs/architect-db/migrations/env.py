@@ -25,13 +25,11 @@ target_metadata = Base.metadata
 
 def get_url() -> str:
     """Resolve the database URL, preferring the environment variable."""
-    return os.environ.get(
-        "ARCHITECT_DATABASE_URL",
-        config.get_main_option(
-            "sqlalchemy.url",
-            "postgresql+asyncpg://architect:architect_dev@localhost:5432/architect",
-        ),
-    )
+    url = os.environ.get("ARCHITECT_DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    if not url:
+        msg = "Set ARCHITECT_DATABASE_URL or sqlalchemy.url in alembic.ini"
+        raise RuntimeError(msg)
+    return url
 
 
 def run_migrations_offline() -> None:

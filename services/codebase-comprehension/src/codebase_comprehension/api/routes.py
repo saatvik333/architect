@@ -63,7 +63,6 @@ class EmbedRequest(BaseModel):
 
     directory: str = Field(description="Absolute path to the directory to embed.")
     database_url: str = Field(
-        default="postgresql+asyncpg://architect:architect_dev@localhost:5432/architect",
         description="Async database URL for pgvector storage.",
     )
 
@@ -184,7 +183,7 @@ async def semantic_search(
     query: str,
     root_path: str | None = None,
     limit: int = 20,
-    database_url: str = "postgresql+asyncpg://architect:architect_dev@localhost:5432/architect",
+    database_url: str = "",
 ) -> SemanticSearchResponse:
     """Search for code using semantic similarity via pgvector."""
     from codebase_comprehension.embeddings import EmbeddingGenerator
