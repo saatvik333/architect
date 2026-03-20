@@ -5,10 +5,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from architect_common.enums import SandboxStatus
 from architect_db.models.base import Base, UUIDPrimaryKeyMixin
 
 
@@ -22,7 +24,12 @@ class SandboxSession(UUIDPrimaryKeyMixin, Base):
 
     task_id: Mapped[str | None] = mapped_column(Text, ForeignKey("tasks.id"), nullable=True)
     agent_id: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(Text, nullable=False, default="creating", index=True)
+    status: Mapped[str] = mapped_column(
+        sa.Enum(SandboxStatus, native_enum=False, length=64),
+        nullable=False,
+        default="creating",
+        index=True,
+    )
 
     container_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     image: Mapped[str | None] = mapped_column(Text, nullable=True)

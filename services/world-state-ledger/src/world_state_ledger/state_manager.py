@@ -24,6 +24,8 @@ from world_state_ledger.models import Proposal, StateMutation, WorldState
 
 logger = get_logger(component="world_state_ledger.state_manager")
 
+_CHECKPOINT_INTERVAL = 20  # Create a full checkpoint every N versions
+
 
 class StateManager:
     """Manages the lifecycle of world state: reads, proposals, and commits.
@@ -47,6 +49,8 @@ class StateManager:
         """Return the latest world state snapshot.
 
         Reads from the Redis cache first; falls back to DB on cache miss.
+        For delta-based storage, the latest row may not carry a full snapshot,
+        so we reconstruct from the nearest checkpoint when necessary.
         """
         cached = await self._cache.get_current_state()
         if cached is not None:
@@ -65,26 +69,69 @@ class StateManager:
             await self._cache.set_current_state(state.model_dump(mode="json"), state.version)
             return state
 
-        state = WorldState.model_validate(row.state_snapshot)
+        # If the latest row is a checkpoint, use its snapshot directly.
+        if row.is_checkpoint and row.state_snapshot is not None:
+            state = WorldState.model_validate(row.state_snapshot)
+        else:
+            # Reconstruct from the nearest checkpoint.
+            state = await self.get_version(row.version)
+
         await self._cache.set_current_state(state.model_dump(mode="json"), state.version)
         return state
 
     async def get_version(self, version: int) -> WorldState:
-        """Return a specific historical version of the world state.
+        """Return a specific historical version by replaying from the nearest checkpoint.
 
         Raises:
             LedgerVersionNotFoundError: If the requested version does not exist.
         """
         async with self._session_factory() as session:
-            row = await session.get(LedgerRow, version)
-
-        if row is None:
-            raise LedgerVersionNotFoundError(
-                f"Ledger version {version} not found",
-                details={"version": version},
+            # Find the nearest checkpoint at or before the requested version.
+            checkpoint_stmt = (
+                select(LedgerRow)
+                .where(LedgerRow.is_checkpoint.is_(True), LedgerRow.version <= version)
+                .order_by(LedgerRow.version.desc())
+                .limit(1)
             )
+            result = await session.execute(checkpoint_stmt)
+            checkpoint_row = result.scalar_one_or_none()
 
-        return WorldState.model_validate(row.state_snapshot)
+            if checkpoint_row is None:
+                # No checkpoint exists — start from pristine state at version 0.
+                state = WorldState()
+                start_version = 0
+            else:
+                state = WorldState.model_validate(checkpoint_row.state_snapshot)
+                start_version = checkpoint_row.version
+
+            if start_version == version:
+                return state
+
+            # Fetch all delta rows between the checkpoint and the target version.
+            deltas_stmt = (
+                select(LedgerRow)
+                .where(LedgerRow.version > start_version, LedgerRow.version <= version)
+                .order_by(LedgerRow.version.asc())
+            )
+            result = await session.execute(deltas_stmt)
+            delta_rows = result.scalars().all()
+
+            if not delta_rows:
+                raise LedgerVersionNotFoundError(
+                    f"Ledger version {version} not found",
+                    details={"version": version},
+                )
+
+            # Replay mutations to reconstruct the target version.
+            for row in delta_rows:
+                if row.is_checkpoint and row.state_snapshot is not None:
+                    state = WorldState.model_validate(row.state_snapshot)
+                elif row.mutations:
+                    mutations = [StateMutation.model_validate(m) for m in row.mutations]
+                    state = self._apply_mutations(state, mutations)
+
+            state.version = LedgerVersion(version)
+            return state
 
     # ── Proposal lifecycle ───────────────────────────────────────────
 
@@ -168,8 +215,11 @@ class StateManager:
 
             if locked_row is None:
                 current_state = WorldState()
-            else:
+            elif locked_row.is_checkpoint and locked_row.state_snapshot is not None:
                 current_state = WorldState.model_validate(locked_row.state_snapshot)
+            else:
+                # Latest row is a delta — reconstruct from nearest checkpoint.
+                current_state = await self._reconstruct_version(session, locked_row.version)
 
             # 3. Optimistic concurrency guard — reject if state moved since proposal.
             if current_state.version != proposal_row.ledger_version_before:
@@ -211,10 +261,14 @@ class StateManager:
             new_state.version = new_version
             new_state.updated_at = now
 
-            # Write new ledger snapshot.
+            # Determine whether this version should be a full checkpoint.
+            is_checkpoint = new_version % _CHECKPOINT_INTERVAL == 0
+
             ledger_row = LedgerRow(
                 version=new_version,
-                state_snapshot=new_state.model_dump(mode="json"),
+                state_snapshot=new_state.model_dump(mode="json") if is_checkpoint else None,
+                mutations=[m.model_dump(mode="json") for m in mutations],
+                is_checkpoint=is_checkpoint,
                 updated_at=now,
                 proposal_id=proposal_id,
             )
@@ -258,6 +312,49 @@ class StateManager:
         return True
 
     # ── Private helpers ──────────────────────────────────────────────
+
+    async def _reconstruct_version(self, session: AsyncSession, version: int) -> WorldState:
+        """Reconstruct a world state version within an existing *session*.
+
+        Used by ``validate_and_commit`` to rebuild the current state when the
+        latest ledger row is a delta (not a checkpoint).
+        """
+        checkpoint_stmt = (
+            select(LedgerRow)
+            .where(LedgerRow.is_checkpoint.is_(True), LedgerRow.version <= version)
+            .order_by(LedgerRow.version.desc())
+            .limit(1)
+        )
+        result = await session.execute(checkpoint_stmt)
+        checkpoint_row = result.scalar_one_or_none()
+
+        if checkpoint_row is None:
+            state = WorldState()
+            start_version = 0
+        else:
+            state = WorldState.model_validate(checkpoint_row.state_snapshot)
+            start_version = checkpoint_row.version
+
+        if start_version == version:
+            return state
+
+        deltas_stmt = (
+            select(LedgerRow)
+            .where(LedgerRow.version > start_version, LedgerRow.version <= version)
+            .order_by(LedgerRow.version.asc())
+        )
+        result = await session.execute(deltas_stmt)
+        delta_rows = result.scalars().all()
+
+        for row in delta_rows:
+            if row.is_checkpoint and row.state_snapshot is not None:
+                state = WorldState.model_validate(row.state_snapshot)
+            elif row.mutations:
+                muts = [StateMutation.model_validate(m) for m in row.mutations]
+                state = self._apply_mutations(state, muts)
+
+        state.version = LedgerVersion(version)
+        return state
 
     @staticmethod
     def _set_at_path(data: dict[str, Any], path: str, value: Any) -> None:

@@ -5,10 +5,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from architect_common.enums import EvalVerdict
 from architect_db.models.base import Base, UUIDPrimaryKeyMixin
 
 
@@ -26,7 +28,9 @@ class EvaluationReport(UUIDPrimaryKeyMixin, Base):
     )
     agent_id: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    verdict: Mapped[str] = mapped_column(Text, nullable=False)
+    verdict: Mapped[str] = mapped_column(
+        sa.Enum(EvalVerdict, native_enum=False, length=64), nullable=False
+    )
     layers_run: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     layer_results: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 

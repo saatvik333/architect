@@ -9,6 +9,7 @@ from architect_common.enums import EvalVerdict, EventType, StatusEnum
 from architect_common.errors import InvalidTransitionError
 from architect_common.logging import get_logger
 from architect_common.types import AgentId, TaskId, utcnow
+from task_graph_engine.distributed_lock import DistributedSchedulerLock
 from task_graph_engine.graph import TaskDAG
 from task_graph_engine.models import Task, TaskRetryRecord, TaskTimestamps
 
@@ -42,12 +43,14 @@ class TaskScheduler:
         task_repo: TaskRepository,
         event_publisher: EventPublisher,
         dag: TaskDAG | None = None,
+        distributed_lock: DistributedSchedulerLock | None = None,
     ) -> None:
         self._task_repo = task_repo
         self._event_publisher = event_publisher
         self._dag = dag or TaskDAG()
         self._completed: set[TaskId] = set()
-        self._schedule_lock = asyncio.Lock()
+        self._distributed_lock = distributed_lock or DistributedSchedulerLock()
+        self._schedule_lock = asyncio.Lock()  # keep as fallback
 
     @property
     def dag(self) -> TaskDAG:
@@ -84,8 +87,8 @@ class TaskScheduler:
     async def schedule_and_claim(self, agent_id: AgentId) -> Task | None:
         """Atomically schedule the next ready task and mark it as running.
 
-        Acquires a lock so that two agents cannot claim the same task
-        concurrently.
+        Acquires a distributed lock so that two scheduler instances cannot
+        claim the same task concurrently.
 
         Args:
             agent_id: The agent that will execute the claimed task.
@@ -94,10 +97,21 @@ class TaskScheduler:
             The claimed :class:`Task` (now in RUNNING status), or ``None``
             if no task is ready.
         """
-        async with self._schedule_lock:
+        async with self._distributed_lock.schedule_lock():
+            # Sync completed set from distributed state
+            dist_completed = await self._distributed_lock.get_completed()
+            self._completed.update(TaskId(tid) for tid in dist_completed)
+
             task = await self.schedule_next()
             if task is None:
                 return None
+
+            # Try to claim atomically
+            claimed = await self._distributed_lock.try_claim_task(str(task.id))
+            if not claimed:
+                logger.info("task_already_claimed", task_id=task.id)
+                return None
+
             await self.mark_running(task.id, agent_id)
             return self._dag.get_task(task.id)
 
@@ -162,6 +176,7 @@ class TaskScheduler:
         )
         self._dag.update_task(task_id, updated)
         self._completed.add(task_id)
+        await self._distributed_lock.mark_completed(str(task_id))
 
         await self._task_repo.update_status(task_id, StatusEnum.COMPLETED)
         await self._publish_event(

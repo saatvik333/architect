@@ -27,7 +27,7 @@ class PostgresConfig(BaseSettings):
             raise ValueError(msg)
         return v
 
-    pool_size: int = Field(default=5, ge=1)
+    pool_size: int = Field(default=3, ge=1)
     max_overflow: int = Field(default=5, ge=0)
     pool_recycle: int = Field(default=3600, ge=0)
     pool_timeout: int = Field(default=30, ge=1)

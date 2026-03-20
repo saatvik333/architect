@@ -69,6 +69,7 @@ flowchart TD
 **Purpose:** Single source of truth for the entire system. Every piece of mutable state -- task status, budget consumption, agent activity, build results, repo state -- lives in the versioned world state.
 
 **Key abstractions:**
+
 - `WorldState` -- Mutable top-level state snapshot containing `SpecState`, `RepoState`, `BuildState`, `InfraState`, `AgentState`, `BudgetState`
 - `Proposal` -- An immutable mutation request containing a list of `StateMutation` objects
 - `StateMutation` -- A single field-level change addressed by dot-path (e.g. `"budget.consumed_tokens"`) with `old_value` / `new_value` for optimistic concurrency
@@ -87,6 +88,7 @@ flowchart TD
 **Purpose:** Decomposes high-level specifications into a DAG of executable tasks, manages dependencies, and schedules work based on priority and readiness.
 
 **Key abstractions:**
+
 - `TaskDAG` -- NetworkX-backed directed acyclic graph where each node stores a `Task` and edges represent dependency relationships
 - `TaskDecomposer` -- Converts a spec dict into a list of `Task` objects. Phase 1 uses deterministic decomposition (impl -> test -> review per module). Phase 2+ uses LLM-assisted decomposition
 - `TaskScheduler` -- Picks the highest-priority ready task, manages lifecycle transitions (`PENDING -> RUNNING -> COMPLETED/FAILED`), enforces valid state transitions, handles retry logic
@@ -103,6 +105,7 @@ flowchart TD
 **Purpose:** Provides isolated, resource-limited Docker containers for running generated code. No code touches the host filesystem.
 
 **Key abstractions:**
+
 - `DockerExecutor` -- Creates containers, runs commands, writes/reads files via tar archives, destroys containers. Each sandbox session maps to one container
 - `SandboxSession` -- Tracks container ID, status, audit log, resource usage, and timestamps
 - `SandboxSpec` -- Defines the sandbox configuration: base image, resource limits, task/agent IDs
@@ -144,6 +147,7 @@ flowchart TD
 **Purpose:** LLM-powered agent that plans an implementation approach, generates code, writes it to a sandbox, runs tests, and iterates on failures.
 
 **Key abstractions:**
+
 - `CodingAgentLoop` -- Orchestrates the full agent lifecycle: plan -> generate -> write to sandbox -> test -> fix -> iterate
 - `TaskPlanner` -- Uses the LLM to produce an implementation plan from spec and codebase context
 - `CodeGenerator` -- Uses the LLM to produce source files and test files. Also has `fix_errors()` for iterating on failures
@@ -162,6 +166,7 @@ flowchart TD
 **Purpose:** Transforms vague natural-language task descriptions into formal, testable specifications via Claude LLM. If the input is ambiguous, returns clarification questions instead of guessing.
 
 **Key abstractions:**
+
 - `TaskSpec` -- Frozen Pydantic model containing intent, constraints, success criteria (list of `AcceptanceCriterion`), file targets, assumptions, and open questions
 - `AcceptanceCriterion` -- Each criterion has an ID, description, test type (`unit`/`integration`/`adversarial`), and `automated` flag
 - `SpecParser` -- Takes raw text + optional clarification answers, calls Claude with a structured prompt, returns `SpecResult` (either a `TaskSpec` or a list of `ClarificationQuestion`)
@@ -179,6 +184,7 @@ flowchart TD
 **Purpose:** Routes tasks to the cheapest model tier that can reliably handle them, with automatic escalation on failure.
 
 **Key abstractions:**
+
 - `ComplexityScorer` -- Scores task complexity 0.0--1.0 based on weighted factors: task type (review=0.8, fix_bug=0.7, implement=0.5, refactor=0.4, test=0.2), token estimate, description length, and keyword signals ("security", "concurrent", "migration" increase score)
 - `Router` -- Maps complexity scores to model tiers via configurable thresholds (>0.7 → Tier 1/Opus, >0.3 → Tier 2/Sonnet, else → Tier 3/Haiku). Static overrides: `REVIEW_CODE` always Tier 1, `WRITE_TEST` always Tier 3
 - `EscalationPolicy` -- Tracks failures per task. After `max_tier_failures` (default 2) at one tier, escalates: Tier 3 → Tier 2 → Tier 1 → human. Reset on success
@@ -196,6 +202,7 @@ flowchart TD
 **Purpose:** Gives agents deep, accurate understanding of the target codebase through AST analysis. Pure Python -- no LLM calls needed.
 
 **Key abstractions:**
+
 - `ASTIndexer` -- Parses Python files with the `ast` module, extracts functions (sync/async, parameters, return types, decorators, calls), classes (bases, methods, docstrings), and imports (absolute/relative)
 - `CallGraphBuilder` -- Builds forward and reverse call graphs from `FunctionDef.calls` across all indexed files. Key format: `file_path::function_name`
 - `ConventionExtractor` -- Detects naming patterns (snake_case functions, PascalCase classes), file organization, common patterns (async usage, decorator prevalence), and test patterns
@@ -219,6 +226,7 @@ flowchart TD
 **Purpose:** Provides typed inter-agent messaging over NATS JetStream for coordination, context sharing, and escalation.
 
 **Key abstractions:**
+
 - `MessageBus` -- Wraps `nats.py` async client. Supports publish (fire-and-forget), subscribe (with optional queue groups for load balancing), and request/reply (with configurable timeout). Manages JetStream stream creation and subscription lifecycle
 - `AgentMessage` -- Frozen Pydantic model with sender (`AgentId`), optional recipient (None = broadcast), `MessageType`, payload dict, correlation ID, and timestamp
 - `MessageType` -- 8 typed variants: `task.assigned`, `task.completed`, `context.request`, `context.response`, `state.proposal`, `escalation`, `disagreement`, `knowledge.update`
@@ -317,6 +325,7 @@ flowchart TD
 ```
 
 Each `StateMutation` contains:
+
 - `path`: Dot-separated field address (e.g. `"budget.consumed_tokens"`)
 - `old_value`: Expected current value (for optimistic concurrency check)
 - `new_value`: The value to write
@@ -337,11 +346,11 @@ Redis serves as the hot cache for the current world state snapshot. The `StateCa
 
 The system defines three model tiers in `architect_common.enums.ModelTier`:
 
-| Tier | Class | Model ID | Use Cases |
-|------|-------|----------|-----------|
-| **Tier 1** (Opus) | Maximum capability | `claude-opus-4-20250514` | Architecture decisions, security review, code review (static override) |
-| **Tier 2** (Sonnet) | Balanced | `claude-sonnet-4-20250514` | Feature implementation, bug fixes, task decomposition |
-| **Tier 3** (Haiku) | Fast and cheap | `claude-haiku-3-20250305` | Scaffolding, test writing (static override), formatting, simple fixes |
+| Tier                | Class              | Model ID                   | Use Cases                                                              |
+| ------------------- | ------------------ | -------------------------- | ---------------------------------------------------------------------- |
+| **Tier 1** (Opus)   | Maximum capability | `claude-opus-4-20250514`   | Architecture decisions, security review, code review (static override) |
+| **Tier 2** (Sonnet) | Balanced           | `claude-sonnet-4-20250514` | Feature implementation, bug fixes, task decomposition                  |
+| **Tier 3** (Haiku)  | Fast and cheap     | `claude-haiku-3-20250305`  | Scaffolding, test writing (static override), formatting, simple fixes  |
 
 The Multi-Model Router (`services/multi-model-router/`) dynamically assigns tiers based on:
 
@@ -354,15 +363,15 @@ The Multi-Model Router (`services/multi-model-router/`) dynamically assigns tier
 
 ## Evaluation Layers
 
-| Layer | Name | Status | Verdict on Failure | Auto-fix Behavior |
-|-------|------|--------|--------------------|--------------------|
-| L1 | Compilation | Implemented | FAIL_HARD | Not retryable -- syntax errors must be fixed by regeneration |
-| L2 | Unit Tests | Implemented | FAIL_SOFT | Errors fed back to agent for iterative fixing |
-| L3 | Integration Tests | Implemented | FAIL_SOFT | Errors fed back with broader context |
-| L4 | Adversarial | Implemented | FAIL_SOFT | LLM-generated edge cases and attack vectors, severity-based |
-| L5 | Spec Compliance | Implemented | FAIL_SOFT/HARD | Fuzzy-matches criteria to tests; <50% met → FAIL_HARD |
-| L6 | Architecture | Implemented | FAIL_SOFT/HARD | Cross-service import violations → FAIL_HARD, lint → FAIL_SOFT |
-| L7 | Regression | Implemented | FAIL_HARD | Full suite must pass; count must meet or exceed baseline |
+| Layer | Name              | Status      | Verdict on Failure | Auto-fix Behavior                                             |
+| ----- | ----------------- | ----------- | ------------------ | ------------------------------------------------------------- |
+| L1    | Compilation       | Implemented | FAIL_HARD          | Not retryable -- syntax errors must be fixed by regeneration  |
+| L2    | Unit Tests        | Implemented | FAIL_SOFT          | Errors fed back to agent for iterative fixing                 |
+| L3    | Integration Tests | Implemented | FAIL_SOFT          | Errors fed back with broader context                          |
+| L4    | Adversarial       | Implemented | FAIL_SOFT          | LLM-generated edge cases and attack vectors, severity-based   |
+| L5    | Spec Compliance   | Implemented | FAIL_SOFT/HARD     | Fuzzy-matches criteria to tests; <50% met → FAIL_HARD         |
+| L6    | Architecture      | Implemented | FAIL_SOFT/HARD     | Cross-service import violations → FAIL_HARD, lint → FAIL_SOFT |
+| L7    | Regression        | Implemented | FAIL_HARD          | Full suite must pass; count must meet or exceed baseline      |
 
 The evaluator runs layers in order. When `fail_fast=True` (the default), a FAIL_HARD verdict in any layer short-circuits the remaining layers.
 
@@ -373,6 +382,7 @@ The evaluator runs layers in order. When `fail_fast=True` (the default), a FAIL_
 ### Why uv workspaces
 
 The monorepo contains 24 Python packages (6 libs, 15 services, 2 apps, 1 root). uv workspaces provide:
+
 - Single lockfile (`uv.lock`) for reproducible installs across all packages
 - Fast dependency resolution and installation (10--100x faster than pip)
 - Workspace-aware `--all-packages` flag for installing everything in one command
@@ -381,6 +391,7 @@ The monorepo contains 24 Python packages (6 libs, 15 services, 2 apps, 1 root). 
 ### Why Temporal
 
 The task execution loop involves multi-step workflows that may fail partway through (LLM call -> sandbox execution -> evaluation). Temporal provides:
+
 - **Durable execution:** Workflows survive process restarts. If a worker crashes mid-task, Temporal replays the workflow from the last checkpoint
 - **Built-in retries:** Activity-level retry policies with exponential backoff
 - **Visibility:** The Temporal UI (port 8080) shows running workflows, their state, and history
@@ -389,6 +400,7 @@ The task execution loop involves multi-step workflows that may fail partway thro
 ### Why proposal-gated state
 
 Direct state mutation by agents would create race conditions and make debugging impossible. The proposal pipeline provides:
+
 - **Audit trail:** Every state change has a proposal ID, agent ID, rationale, and timestamp
 - **Optimistic concurrency:** The `old_value` check in each mutation prevents lost updates when multiple agents try to modify the same field
 - **Rollback-friendly:** Since every ledger version is a full snapshot, point-in-time state recovery is trivial
@@ -397,6 +409,7 @@ Direct state mutation by agents would create race conditions and make debugging 
 ### Why Docker sandboxing
 
 Generated code is untrusted by definition. Docker containers provide:
+
 - **Filesystem isolation:** Code runs in `/workspace` inside the container; the host filesystem is never exposed
 - **Resource limits:** CPU, memory, and timeout constraints prevent runaway processes
 - **Security scanning:** Commands are validated against a blocklist before execution (no network access, no privilege escalation, no host mounts)
@@ -406,6 +419,7 @@ Generated code is untrusted by definition. Docker containers provide:
 ### Why Pydantic frozen models
 
 All domain models (`Task`, `Proposal`, `StateMutation`, `EvaluationReport`, etc.) inherit from `ArchitectBase`, which sets `frozen=True`:
+
 - **Immutability:** Once created, a domain model cannot be accidentally mutated. State changes produce new instances via `model_copy(update={...})`
 - **Thread safety:** Frozen models can be safely shared across async tasks and Temporal activities
 - **Hashability:** Frozen models can be used as dict keys or set members

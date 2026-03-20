@@ -6,287 +6,197 @@
 
 ---
 
-## What is ARCHITECT?
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg?style=flat)](https://www.python.org/downloads/)
+[![Tests](https://img.shields.io/badge/tests-739_passed-brightgreen.svg?style=flat)](#testing)
+[![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg?style=flat)](#testing)
+[![mypy](https://img.shields.io/badge/type_checked-mypy_strict-blue.svg?style=flat)](http://mypy-lang.org/)
+[![License](https://img.shields.io/badge/license-PolyForm_NC-orange.svg?style=flat)](LICENSE)
+[![Phase](https://img.shields.io/badge/phase-2_of_5-blueviolet.svg?style=flat)](#roadmap)
 
-ARCHITECT is an autonomous multi-agent system that implements the full software engineering loop:
+## What is this?
 
-**specify --> build --> test --> deploy --> observe --> repair --> learn**
+ARCHITECT takes a project spec and turns it into working, tested code — autonomously. It decomposes specs into a task DAG, assigns LLM-powered agents, executes in Docker sandboxes, evaluates through 7 layers, and records every mutation in a proposal-gated ledger. 14 components. 5 build phases. 2 fully implemented.
 
-It decomposes high-level project specifications into a directed acyclic graph of tasks, assigns them to LLM-powered agents, executes code in isolated Docker sandboxes, evaluates results through a multi-layer pipeline, and records every state change in a proposal-gated ledger.
-
-The system is composed of **14 components** across **5 build phases**. Phase 1 (Foundation) and Phase 2 (Multi-Agent & Evaluation) are fully implemented. Phases 3--5 are stubbed and ready for incremental build-out.
-
----
-
-## Architecture Overview
+## How it works
 
 ```
-                         +------------------+
-                         |   CLI / API      |
-                         |   Gateway        |
-                         +--------+---------+
-                                  |
-                                  v
-                    +-------------+-------------+
-                    |    Task Graph Engine       |
-                    |  (DAG decomposition +      |
-                    |   priority scheduler)      |
-                    +---+--------+----------+---+
-                        |        |          |
-           +------------+   +---+---+  +---+----------+
-           v                v       v  v              v
-   +--------------+  +----------+  +----------------+
-   | Coding Agent |  | Spec     |  | Multi-Model    |
-   | (plan/gen/   |  | Engine   |  | Router         |
-   |  fix loop)   |  | [P2]     |  | [P2]           |
-   +------+-------+  +----------+  +----------------+
-          |
-          v
-   +--------------+        +-----------------+
-   |  Execution   |------->|  Evaluation     |
-   |  Sandbox     |        |  Engine         |
-   |  (Docker)    |        |  (7 layers)     |
-   +--------------+        +--------+--------+
-                                    |
-                      +-------------+-------------+
-                      |                           |
-                      v                           v
-             +----------------+          +----------------+
-             | PASS: commit   |          | FAIL: retry or |
-             | to ledger      |          | escalate       |
-             +-------+--------+          +-------+--------+
-                     |                           |
-                     v                           v
-          +-------------------+       +-------------------+
-          | World State       |       | Failure Taxonomy  |
-          | Ledger            |       | [P4]              |
-          | (single source    |       +-------------------+
-          |  of truth)        |
-          +---------+---------+
-                    |
-     +--------------+--------------+
-     |              |              |
-     v              v              v
-+-----------+ +-----------+ +-----------+
-| Knowledge | | Economic  | | Security  |
-| Memory    | | Governor  | | Immune    |
-| [P3]      | | [P3]      | | [P3]      |
-+-----------+ +-----------+ +-----------+
+spec → Spec Engine parses intent → Task Graph Engine decomposes into DAG →
+Coding Agent generates code via Claude → Execution Sandbox runs it in Docker →
+Evaluation Engine judges across 7 layers → pass? commit to World State Ledger :
+fail? retry or escalate
 ```
 
-### All 14 Components
+Every state change goes through a **proposal → validate → commit** pipeline. Nothing mutates without a paper trail.
 
-| #   | Component                  | Phase | Description                                                                |
-| --- | -------------------------- | ----- | -------------------------------------------------------------------------- |
-| 1   | **Spec Engine**            | P2    | NL-to-formal-spec parsing via Claude LLM, clarification detection          |
-| 2   | **World State Ledger**     | P1    | Single source of truth -- proposal-gated, versioned world state            |
-| 3   | **Task Graph Engine**      | P1    | DAG-based task decomposition, dependency tracking, priority scheduling     |
-| 4   | **Multi-Model Router**     | P2    | Complexity scoring + tier routing with escalation policy                    |
-| 5   | **Codebase Comprehension** | P2    | Python AST indexing, call graph, convention extraction, context assembly    |
-| 6   | **Agent Comm Bus**         | P2    | NATS JetStream pub/sub/request-reply with dead letter handling             |
-| 7   | **Execution Sandbox**      | P1    | Docker-isolated code execution with resource limits and security scanning  |
-| 8   | **Evaluation Engine**      | P1+P2 | 7-layer evaluation: compilation, unit/integration tests, adversarial, spec compliance, architecture, regression |
-| 9   | **Knowledge Memory**       | P3    | 5-layer memory hierarchy for patterns, failures, and solutions             |
-| 10  | **Economic Governor**      | P3    | Token budget enforcement and cost optimization                             |
-| 11  | **Security Immune**        | P3    | Automated security scanning and vulnerability detection                    |
-| 12  | **Deployment Pipeline**    | P4    | Canary deploys, health checks, and automatic rollback                      |
-| 13  | **Failure Taxonomy**       | P4    | Structured failure classification and learning                             |
-| 14  | **Human Interface**        | P5    | Dashboard, escalation UI, and human-in-the-loop controls                   |
-| --  | **Coding Agent**           | P1    | LLM-powered code generation with plan/generate/test/fix loop               |
+```mermaid
+graph TD
+    A[CLI / API Gateway] --> B[Task Graph Engine]
+    B --> C[Coding Agent]
+    B --> D[Spec Engine]
+    B --> E[Multi-Model Router]
+    C --> F[Execution Sandbox]
+    F --> G[Evaluation Engine]
+    G -->|PASS| H[World State Ledger]
+    G -->|FAIL| I[Retry / Escalate]
+    I --> C
+    H --> J[Knowledge Memory]
+    H --> K[Economic Governor]
+    H --> L[Security Immune]
 
----
+    style A fill:#1a1a2e,stroke:#e94560,color:#fff
+    style B fill:#1a1a2e,stroke:#0f3460,color:#fff
+    style C fill:#1a1a2e,stroke:#0f3460,color:#fff
+    style F fill:#1a1a2e,stroke:#0f3460,color:#fff
+    style G fill:#1a1a2e,stroke:#e94560,color:#fff
+    style H fill:#1a1a2e,stroke:#16c79a,color:#fff
+    style I fill:#1a1a2e,stroke:#e94560,color:#fff
+    style J fill:#1a1a2e,stroke:#333,color:#888
+    style K fill:#1a1a2e,stroke:#333,color:#888
+    style L fill:#1a1a2e,stroke:#333,color:#888
+```
 
-## Quick Start
+## Quick start
 
-### Prerequisites
-
-- Python 3.12+
-- Docker (for sandboxing and infrastructure)
-- [uv](https://docs.astral.sh/uv/) package manager
-
-### Setup
+You need Python 3.12+, Docker, and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-# Clone and install
-git clone <repo>
-cd architect
-make install
-
-# Start infrastructure (Postgres, Redis, Temporal, NATS)
-make infra-up
-
-# Run database migrations
-make migrate
-
-# Run tests
-make test
-
-# Start the full system (infra + all services + gateway + dashboard)
-make run-all
-
-# Stop everything
-make stop-all
+git clone https://github.com/saatvik333/osoleer-agi.git
+cd osoleer-agi
+make install        # install all workspace packages
+make run-all        # start infra + services + gateway + dashboard
 ```
 
-### Running the Full System
+That's it. Dashboard at [localhost:3000](http://localhost:3000), API at [localhost:8000](http://localhost:8000), Temporal UI at [localhost:8080](http://localhost:8080).
 
-The fastest way to get ARCHITECT running end-to-end:
+Tear it all down with `make stop-all`.
+
+<details>
+<summary><b>Step by step</b></summary>
 
 ```bash
-make install       # Install all workspace packages
-make run-all       # Start infra, run migrations, launch all services + gateway + dashboard
+make install        # install deps
+make infra-up       # postgres, redis, temporal, nats
+make migrate        # run alembic migrations
+make test           # 739 tests, ~16s
+make run-all        # everything
 ```
 
-This starts:
+</details>
 
-- **Dashboard** at <http://localhost:3000>
-- **API Gateway** at <http://localhost:8000>
-- **Temporal UI** at <http://localhost:8080>
-- All 9 backend services on ports 8001--8013
+## Components
 
-When finished, shut everything down with `make stop-all`.
+| # | Component | Phase | What it does |
+|---|-----------|-------|--------------|
+| 1 | **Spec Engine** | P2 | NL-to-formal-spec via Claude, clarification detection |
+| 2 | **World State Ledger** | P1 | Proposal-gated, versioned single source of truth |
+| 3 | **Task Graph Engine** | P1 | DAG decomposition, dependency tracking, priority scheduling |
+| 4 | **Multi-Model Router** | P2 | Complexity scoring + tier routing with escalation |
+| 5 | **Codebase Comprehension** | P2 | AST indexing, embeddings, semantic search |
+| 6 | **Agent Comm Bus** | P2 | NATS JetStream pub/sub with dead letter handling |
+| 7 | **Execution Sandbox** | P1 | Docker-isolated execution, seccomp, resource limits |
+| 8 | **Evaluation Engine** | P1 | 7-layer eval: compile, test, adversarial, spec, arch, regression |
+| 9 | Knowledge Memory | P3 | _stub_ |
+| 10 | Economic Governor | P3 | _stub_ |
+| 11 | Security Immune | P3 | _stub_ |
+| 12 | Deployment Pipeline | P4 | _stub_ |
+| 13 | Failure Taxonomy | P4 | _stub_ |
+| 14 | Human Interface | P5 | _stub_ |
+| -- | **Coding Agent** | P1 | Plan/generate/test/fix loop powered by Claude |
 
----
-
-## Project Structure
+## Architecture
 
 ```
-architect/
-├── libs/                          # Shared libraries (no inter-service deps)
-│   ├── architect-common/          # Types, enums, errors, config, interfaces
-│   ├── architect-db/              # SQLAlchemy ORM models, repositories, migrations
-│   ├── architect-events/          # Event schemas, Redis Streams pub/sub
-│   ├── architect-llm/             # Claude API client, cost tracker, rate limiter
-│   ├── architect-sandbox-client/  # Sandbox execution client
-│   └── architect-testing/         # Test factories and mocks
-├── services/                      # The 14 ARCHITECT components
-│   ├── world-state-ledger/        # [P1] Single source of truth
-│   ├── task-graph-engine/         # [P1] DAG task decomposition + scheduler
-│   ├── execution-sandbox/         # [P1] Docker-isolated code execution
-│   ├── evaluation-engine/         # [P1] Multi-layer code evaluation
-│   ├── coding-agent/              # [P1] LLM-powered code generation
-│   ├── spec-engine/               # [P2] NL→formal spec via LLM
-│   ├── multi-model-router/        # [P2] Complexity scoring + tier routing
-│   ├── codebase-comprehension/    # [P2] AST indexing + context assembly
-│   ├── agent-comm-bus/            # [P2] NATS JetStream messaging
-│   ├── knowledge-memory/          # [P3] 5-layer memory hierarchy
-│   ├── economic-governor/         # [P3] Budget enforcement
-│   ├── security-immune/           # [P3] Security scanning
-│   ├── deployment-pipeline/       # [P4] Canary deploys + rollback
-│   ├── failure-taxonomy/          # [P4] Structured learning
-│   └── human-interface/           # [P5] Dashboard + escalation
-├── apps/                          # User-facing applications
-│   ├── cli/                       # CLI: architect submit/status/logs/health
-│   ├── api-gateway/               # Unified API gateway
-│   └── dashboard/                 # React + TypeScript + Tailwind dark-mode SPA
-├── infra/                         # Docker Compose, Dockerfiles, SQL init scripts
-├── tests/                         # Integration and E2E tests
-│   ├── integration/               # Tests requiring infrastructure
-│   └── e2e/                       # Full task lifecycle tests
-├── scripts/                       # Dev setup and health check scripts
-├── .github/                       # CI/CD workflows
-├── pyproject.toml                 # Workspace root: uv workspace config
-└── Makefile                       # Development commands
+osoleer-agi/
+├── libs/                       # shared libraries (no cross-service imports)
+│   ├── architect-common/       # types, errors, config, interfaces
+│   ├── architect-db/           # ORM models, repositories, alembic migrations
+│   ├── architect-events/       # redis streams pub/sub + DLQ
+│   ├── architect-llm/          # claude client, cost tracker, rate limiter
+│   ├── architect-sandbox-client/
+│   └── architect-testing/      # shared test factories
+├── services/                   # the 14 components
+│   ├── world-state-ledger/     # [P1] temporal workflows + fastapi routes
+│   ├── task-graph-engine/      # [P1] networkx DAG + scheduler
+│   ├── execution-sandbox/      # [P1] docker executor + security
+│   ├── evaluation-engine/      # [P1] 7-layer pipeline
+│   ├── coding-agent/           # [P1] llm-powered code gen
+│   ├── spec-engine/            # [P2]
+│   ├── multi-model-router/     # [P2]
+│   ├── codebase-comprehension/ # [P2] tree-sitter + sentence-transformers
+│   └── agent-comm-bus/         # [P2] nats jetstream
+├── apps/
+│   ├── api-gateway/            # unified fastapi gateway
+│   ├── cli/                    # typer CLI
+│   └── dashboard/              # react + typescript + tailwind (bun)
+├── infra/                      # docker-compose, dockerfiles, seccomp profiles
+└── tests/                      # integration + e2e suites
 ```
 
----
+Services never import each other. Communication happens through Temporal workflows and the event bus.
 
-## Tech Stack
+## Tech stack
 
-| Category               | Technology                   | Purpose                                              |
-| ---------------------- | ---------------------------- | ---------------------------------------------------- |
-| Language               | Python 3.12+                 | Runtime                                              |
-| Package management     | uv + hatchling               | Monorepo workspace, fast installs, builds            |
-| State persistence      | PostgreSQL 16                | World state ledger, event log, task storage          |
-| Hot cache / pub-sub    | Redis 7                      | State cache, Redis Streams event bus                 |
-| Workflow orchestration | Temporal                     | Durable execution, automatic retries, crash recovery |
-| Inter-agent messaging  | NATS JetStream               | Typed pub/sub/request-reply between agents           |
-| Dashboard              | React 18 + Vite + Tailwind   | Dark-mode SPA for task monitoring and health         |
-| JS tooling             | Bun                          | Package management and builds for dashboard          |
-| HTTP APIs              | FastAPI                      | Service REST endpoints                               |
-| ORM                    | SQLAlchemy (async) + Alembic | Database models, migrations                          |
-| LLM integration        | Anthropic SDK (Claude)       | Code generation, task decomposition, review          |
-| Sandbox isolation      | Docker                       | Secure, resource-limited code execution              |
-| Task DAG               | NetworkX                     | Directed acyclic graph management                    |
-| Domain models          | Pydantic v2 (frozen)         | Immutable models, validation, serialization          |
-| Logging                | structlog                    | Structured, JSON-compatible logging                  |
-| Linting / formatting   | Ruff                         | Fast Python linting and auto-formatting              |
-| Type checking          | mypy (strict)                | Static type analysis                                 |
-| Testing                | pytest                       | Unit, integration, and E2E tests                     |
+**Runtime:** Python 3.12 &middot; FastAPI &middot; SQLAlchemy (async) &middot; Pydantic v2 (frozen models) &middot; structlog
 
----
+**Infrastructure:** PostgreSQL 16 (pgvector) &middot; Redis 7 &middot; Temporal &middot; NATS JetStream &middot; Docker
 
-## Development Commands
+**AI:** Anthropic SDK (Claude) &middot; sentence-transformers &middot; tree-sitter &middot; PromptFoo
 
-| Command                 | Description                                                               |
-| ----------------------- | ------------------------------------------------------------------------- |
-| `make install`          | Install all workspace packages and dev dependencies                       |
-| `make lint`             | Run ruff check + format check                                             |
-| `make format`           | Auto-format all code with ruff                                            |
-| `make typecheck`        | Run mypy in strict mode across libs, services, and apps                   |
-| `make test`             | Run unit tests (libs + services + apps)                                   |
-| `make test-integration` | Run integration tests (requires running infrastructure)                   |
-| `make test-e2e`         | Run end-to-end tests (full task lifecycle)                                |
-| `make test-all`         | Run all tests (unit + integration + E2E)                                  |
-| `make infra-up`         | Start infrastructure via Docker Compose (Postgres, Redis, Temporal, NATS) |
-| `make infra-down`       | Stop infrastructure containers                                            |
-| `make migrate`          | Run Alembic database migrations                                           |
-| `make dev`              | Start infrastructure + run migrations (full local env)                    |
-| `make run-all`          | Start everything (infra + services + gateway + dashboard)                 |
-| `make stop-all`         | Stop all services and infrastructure                                      |
-| `make clean`            | Remove `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`       |
+**Frontend:** React 19 &middot; TypeScript 5.6 &middot; Vite 8 &middot; Tailwind &middot; Bun
 
----
+**Tooling:** uv &middot; Ruff &middot; mypy (strict) &middot; pytest &middot; Alembic &middot; pre-commit
 
-## Phase Roadmap
+## Development
 
-| Phase  | Name                       | Components                                                                                | Status          |
-| ------ | -------------------------- | ----------------------------------------------------------------------------------------- | --------------- |
-| **P1** | Foundation                 | World State Ledger, Task Graph Engine, Execution Sandbox, Evaluation Engine, Coding Agent | **IMPLEMENTED** |
-| **P2** | Multi-Agent and Evaluation | Spec Engine, Multi-Model Router, Codebase Comprehension, Agent Comm Bus, Dashboard        | **IMPLEMENTED** |
-| **P3** | Intelligence and Autonomy  | Knowledge Memory, Economic Governor, Security Immune                                      | STUB            |
-| **P4** | Production Hardening       | Deployment Pipeline, Failure Taxonomy                                                     | STUB            |
-| **P5** | Scale and Domain Expansion | Human Interface                                                                           | STUB            |
-
----
+```bash
+make install          # install everything
+make lint             # ruff check + format
+make format           # auto-format
+make typecheck        # mypy strict
+make test             # unit tests (~16s)
+make test-integration # needs infra
+make test-e2e         # full lifecycle
+make test-all         # everything
+make dev              # infra-up + migrate
+make run-all          # the whole system
+make stop-all         # tear it down
+make clean            # nuke caches
+```
 
 ## Testing
 
-- **Full test suite** passing across all packages
-- Unit tests colocated in each library and service package
-- Integration tests in `tests/integration/` -- require running infrastructure (`make infra-up`)
-- E2E tests in `tests/e2e/` -- test the full task submission-to-completion lifecycle
+739 tests. 90% coverage. ~16 seconds.
 
-```bash
-# Run unit tests only
-make test
+- Unit tests colocated in each package
+- Integration tests in `tests/integration/` (need `make infra-up`)
+- E2E tests in `tests/e2e/` (full task lifecycle)
+- [PromptFoo](https://www.promptfoo.dev/) LLM regression suites with adversarial inputs
+- mypy strict + ruff enforced on every commit via pre-commit hooks
 
-# Run integration tests (start infra first)
-make infra-up
-make test-integration
+## Roadmap
 
-# Run E2E tests
-make test-e2e
+| Phase | Name | Status |
+|-------|------|--------|
+| **P1** | Foundation | **done** &mdash; WSL, Task Graph, Sandbox, Eval Engine, Coding Agent |
+| **P2** | Multi-Agent | **done** &mdash; Spec Engine, Router, Codebase Comprehension, Comm Bus, Dashboard |
+| **P3** | Intelligence | _next_ &mdash; Knowledge Memory, Economic Governor, Security Immune |
+| **P4** | Production | _planned_ &mdash; Deployment Pipeline, Failure Taxonomy |
+| **P5** | Scale | _planned_ &mdash; Human Interface |
 
-# Run everything
-make test-all
-```
+## Contributing
 
-Dashboard build:
+See [CONTRIBUTING.md](CONTRIBUTING.md). The short version:
 
-```bash
-cd apps/dashboard && bun install && bun run build
-```
-
-Test configuration: pytest with `--import-mode=importlib`, `asyncio_mode=auto`, strict markers for `integration`, `e2e`, and `slow`.
-
----
+1. Fork and branch from `main`
+2. `make install && make test` to verify
+3. Follow [Conventional Commits](https://www.conventionalcommits.org/)
+4. PR against `main`
 
 ## License
 
-ARCHITECT is dual-licensed:
+Dual-licensed:
 
-- **Non-commercial use** — [PolyForm Noncommercial License 1.0.0](LICENSE). Free for personal projects, research, hobby work, study, and contributions. Commercial use is not permitted.
-- **Commercial use** — a separate commercial licence is required. See [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md) for details and how to obtain one.
+- **Non-commercial** &mdash; [PolyForm Noncommercial License 1.0.0](LICENSE). Free for personal projects, research, study, and contributions.
+- **Commercial** &mdash; separate licence required. See [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md).
 
-Copyright (c) 2026 [Saatvik](https://github.com/saatvik333). All rights reserved.
+Copyright &copy; 2026 [Saatvik](https://github.com/saatvik333). All rights reserved.

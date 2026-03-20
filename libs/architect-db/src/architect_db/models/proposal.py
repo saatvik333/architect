@@ -5,10 +5,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import BigInteger, DateTime, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from architect_common.enums import ProposalVerdict
 from architect_db.models.base import Base, UUIDPrimaryKeyMixin
 
 
@@ -26,7 +28,9 @@ class Proposal(UUIDPrimaryKeyMixin, Base):
     mutations: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    verdict: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
+    verdict: Mapped[str] = mapped_column(
+        sa.Enum(ProposalVerdict, native_enum=False, length=64), nullable=False, default="pending"
+    )
     verdict_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(

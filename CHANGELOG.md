@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase B Data Integrity & Performance
+- **Delta-based ledger storage** (P-C1) — mutations stored as diffs instead of full snapshots, with periodic checkpoints every 20 versions; state reconstruction via replay from nearest checkpoint
+- **Sandbox session persistence** (P-C3) — DockerExecutor now persists sessions to DB via SandboxSessionRepository; crash recovery loads active sessions on startup
+- **Horizontal scheduler scaling** (P-C5) — new DistributedSchedulerLock with Redis-backed distributed locking, atomic task claiming via SETNX, distributed completed-set tracking; falls back to in-memory for single-instance
+- **ORM enum columns** (A-M7) — replaced Text columns with `sa.Enum(native_enum=False)` in task, proposal, sandbox, agent, evaluation, and event models
+- **Connection pool sizing** (P-H2) — reduced per-service pool from 5 to 3 (72 max cluster-wide vs 100 Postgres limit); increased Postgres memory limit from 512MB to 1GB
+- Alembic migration 004: add `mutations` and `is_checkpoint` columns to world_state_ledger
+- B6 performance items (P-H4, P-H6, P-H8, P-H10, P-H11) confirmed already resolved in prior work
+
 ### Added — Phase A Security Hardening
 - **API key authentication** on all gateway endpoints (ADR-005 accepted) — `Authorization: Bearer <key>` with constant-time `hmac.compare_digest`, exempt health/docs paths (S-C2, CVSS 9.1 → resolved)
 - **Redis authentication** — `--requirepass` in docker-compose, credentials redacted from logs (S-H3, CVSS 7.5 → resolved)

@@ -2566,6 +2566,7 @@ dependencies = [
     { name = "architect-llm" },
     { name = "fastapi" },
     { name = "networkx" },
+    { name = "redis", extra = ["hiredis"] },
     { name = "temporalio" },
     { name = "uvicorn" },
 ]
@@ -2578,6 +2579,7 @@ requires-dist = [
     { name = "architect-llm", editable = "libs/architect-llm" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "networkx", specifier = ">=3.4" },
+    { name = "redis", extras = ["hiredis"], specifier = ">=5.0" },
     { name = "temporalio", specifier = ">=1.9" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]

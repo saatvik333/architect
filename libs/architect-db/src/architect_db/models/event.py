@@ -5,10 +5,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import BigInteger, DateTime, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from architect_common.enums import EventType
 from architect_db.models.base import Base, UUIDPrimaryKeyMixin
 
 
@@ -20,7 +22,9 @@ class EventLog(UUIDPrimaryKeyMixin, Base):
 
     __tablename__ = "event_log"
 
-    type: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    type: Mapped[str] = mapped_column(
+        sa.Enum(EventType, native_enum=False, length=64), nullable=False, index=True
+    )
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,10 +13,14 @@ from architect_db.models.base import Base
 
 
 class WorldStateLedger(Base):
-    """Versioned world-state snapshot.
+    """Versioned world-state snapshot with delta-based storage.
 
     Maps to the ``world_state_ledger`` table.  Uses a ``BIGSERIAL`` primary key
     (``version``) instead of the standard UUID-based id.
+
+    **Delta storage model:** checkpoint rows (``is_checkpoint=True``) carry a
+    full ``state_snapshot``.  Delta rows store only the ``mutations`` list that
+    produced this version.  ``state_snapshot`` is ``None`` on delta rows.
     """
 
     __tablename__ = "world_state_ledger"
@@ -27,6 +31,13 @@ class WorldStateLedger(Base):
         autoincrement=True,
     )
     state_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    mutations: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    is_checkpoint: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        nullable=False,
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

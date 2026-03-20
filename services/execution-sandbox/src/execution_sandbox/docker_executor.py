@@ -9,6 +9,7 @@ import time
 from typing import Any
 
 import docker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from architect_common.enums import SandboxStatus
 from architect_common.errors import (
@@ -39,10 +40,100 @@ class DockerExecutor(ExecutorBase):
     Each :class:`SandboxSession` maps to exactly one Docker container.
     """
 
-    def __init__(self, docker_socket: str = "/var/run/docker.sock", docker_host: str = "") -> None:
+    def __init__(
+        self,
+        docker_socket: str = "/var/run/docker.sock",
+        docker_host: str = "",
+        session_factory: async_sessionmaker[AsyncSession] | None = None,
+    ) -> None:
         base_url = docker_host if docker_host else f"unix://{docker_socket}"
         self._client: docker.DockerClient = docker.DockerClient(base_url=base_url)
         self._sessions: dict[str, SandboxSession] = {}
+        self._session_factory = session_factory
+
+    # ── Persistence ─────────────────────────────────────────────────
+
+    async def _persist_session(self, session: SandboxSession) -> None:
+        """Save session state to the database if a session factory is configured."""
+        if self._session_factory is None:
+            return
+        from architect_db.models.sandbox import SandboxSession as SandboxSessionRow
+        from architect_db.repositories.sandbox_repo import SandboxSessionRepository
+
+        async with self._session_factory() as db_session:
+            repo = SandboxSessionRepository(db_session)
+            existing = await repo.get_by_id(session.id)
+            if existing is None:
+                row = SandboxSessionRow(
+                    id=session.id,
+                    task_id=session.spec.task_id,
+                    agent_id=session.spec.agent_id,
+                    status=session.status.value,
+                    container_id=session.container_id or "",
+                    image=session.spec.base_image,
+                    created_at=session.timestamps.created_at,
+                    started_at=session.timestamps.started_at,
+                )
+                db_session.add(row)
+            else:
+                existing.status = session.status.value
+                existing.container_id = session.container_id or ""
+                existing.started_at = session.timestamps.started_at
+                existing.completed_at = session.timestamps.completed_at
+                existing.destroyed_at = session.timestamps.destroyed_at
+            await db_session.commit()
+
+    async def load_active_sessions_from_db(self) -> int:
+        """Load active sessions from the database on startup.
+
+        Returns the number of sessions restored.
+        """
+        if self._session_factory is None:
+            return 0
+        from architect_db.repositories.sandbox_repo import SandboxSessionRepository
+
+        async with self._session_factory() as db_session:
+            repo = SandboxSessionRepository(db_session)
+            active_rows = await repo.get_active()
+
+        restored = 0
+        for row in active_rows:
+            if row.id in self._sessions:
+                continue
+            # Check if the container still exists in Docker
+            try:
+                container = await asyncio.to_thread(  # noqa: F841
+                    self._client.containers.get, row.container_id
+                )
+            except docker.errors.NotFound:
+                logger.info("db_session_container_gone", session_id=row.id)
+                continue
+            except docker.errors.APIError:
+                logger.warning("db_session_check_failed", session_id=row.id)
+                continue
+
+            # Reconstruct in-memory session
+            session = SandboxSession(
+                spec=SandboxSpec(
+                    task_id=row.task_id or "",
+                    agent_id=row.agent_id or "",
+                    base_image=row.image or "",
+                ),
+                status=SandboxStatus(row.status),
+                timestamps=SessionTimestamps(
+                    created_at=row.created_at,
+                    started_at=row.started_at,
+                ),
+            )
+            session.id = row.id
+            session.container_id = row.container_id
+            self._sessions[session.id] = session
+            restored += 1
+            logger.info("session_restored_from_db", session_id=row.id)
+
+        if restored:
+            logger.info("sessions_restored", count=restored)
+        return restored
 
     # ── Lifecycle ────────────────────────────────────────────────────
 
@@ -84,6 +175,7 @@ class DockerExecutor(ExecutorBase):
         session.status = SandboxStatus.READY
         session.timestamps.started_at = utcnow()
         self._sessions[session.id] = session
+        await self._persist_session(session)
 
         logger.info(
             "sandbox_created",
@@ -312,6 +404,7 @@ class DockerExecutor(ExecutorBase):
 
         session.status = SandboxStatus.DESTROYED
         session.timestamps.destroyed_at = utcnow()
+        await self._persist_session(session)
         del self._sessions[session_id]
 
         logger.info("sandbox_destroyed", session_id=session_id)

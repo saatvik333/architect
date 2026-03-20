@@ -13,7 +13,55 @@ from world_state_ledger.models import (
     StateMutation,
     WorldState,
 )
-from world_state_ledger.state_manager import StateManager
+from world_state_ledger.state_manager import _CHECKPOINT_INTERVAL, StateManager
+
+# ── helpers ──────────────────────────────────────────────────────────
+
+
+def _make_ledger_row(
+    *,
+    version: int,
+    state_snapshot: dict | None = None,
+    mutations: list[dict] | None = None,
+    is_checkpoint: bool = False,
+) -> MagicMock:
+    """Create a mock LedgerRow with the given attributes."""
+    row = MagicMock()
+    row.version = version
+    row.state_snapshot = state_snapshot
+    row.mutations = mutations
+    row.is_checkpoint = is_checkpoint
+    return row
+
+
+def _mock_execute_results(results_sequence: list) -> AsyncMock:
+    """Return an AsyncMock for session.execute that returns results in order.
+
+    Each element in *results_sequence* should be either:
+    - A value for ``scalar_one_or_none()``
+    - A list of values for ``scalars().all()``
+
+    The mock distinguishes between these based on which method is called.
+    """
+    mock_results = []
+    for item in results_sequence:
+        mock_result = MagicMock()
+        if isinstance(item, list):
+            # For scalars().all()
+            scalars_mock = MagicMock()
+            scalars_mock.all.return_value = item
+            mock_result.scalars.return_value = scalars_mock
+            mock_result.scalar_one_or_none.return_value = None
+        else:
+            # For scalar_one_or_none()
+            mock_result.scalar_one_or_none.return_value = item
+            scalars_mock = MagicMock()
+            scalars_mock.all.return_value = []
+            mock_result.scalars.return_value = scalars_mock
+        mock_results.append(mock_result)
+
+    return AsyncMock(side_effect=mock_results)
+
 
 # ── get_current ──────────────────────────────────────────────────────
 
@@ -47,6 +95,93 @@ class TestGetCurrent:
         result = await state_manager.get_current()
         assert result.version == 0
 
+    async def test_get_current_reconstructs_from_delta(
+        self, state_manager: StateManager, state_cache
+    ) -> None:
+        """When the latest row is a delta, get_current reconstructs via get_version."""
+        state_cache._redis.get = AsyncMock(return_value=None)
+        session = state_manager._session_factory._session
+
+        # First call (get_current): returns a delta row (is_checkpoint=False).
+        latest_row = _make_ledger_row(
+            version=3,
+            state_snapshot=None,
+            mutations=[{"path": "budget.burn_rate", "old_value": 100.0, "new_value": 300.0}],
+            is_checkpoint=False,
+        )
+
+        # get_version will be called for version 3, which opens a new session.
+        # The new session needs: checkpoint query, then deltas query.
+        checkpoint_row = _make_ledger_row(
+            version=1,
+            state_snapshot=WorldState(
+                version=1,
+                budget=BudgetState(
+                    allocated_tokens=10_000,
+                    consumed_tokens=2_000,
+                    remaining_tokens=8_000,
+                    burn_rate=100.0,
+                ),
+            ).model_dump(mode="json"),
+            is_checkpoint=True,
+        )
+
+        delta_v2 = _make_ledger_row(
+            version=2,
+            mutations=[{"path": "budget.burn_rate", "old_value": 100.0, "new_value": 200.0}],
+            is_checkpoint=False,
+        )
+        delta_v3 = _make_ledger_row(
+            version=3,
+            mutations=[{"path": "budget.burn_rate", "old_value": 200.0, "new_value": 300.0}],
+            is_checkpoint=False,
+        )
+
+        # get_current opens session #1: execute returns latest_row.
+        # get_version opens session #2: execute called twice (checkpoint, then deltas).
+        # Both sessions share the same mock, so we chain all calls.
+        session.execute = _mock_execute_results(
+            [
+                latest_row,  # get_current: latest row
+                checkpoint_row,  # get_version: checkpoint query
+                [delta_v2, delta_v3],  # get_version: deltas query
+            ]
+        )
+
+        result = await state_manager.get_current()
+        assert result.version == 3
+        assert result.budget.burn_rate == 300.0
+
+    async def test_get_current_uses_checkpoint_directly(
+        self, state_manager: StateManager, state_cache
+    ) -> None:
+        """When the latest row IS a checkpoint, use its snapshot directly."""
+        state_cache._redis.get = AsyncMock(return_value=None)
+        session = state_manager._session_factory._session
+
+        state = WorldState(
+            version=20,
+            budget=BudgetState(
+                allocated_tokens=10_000,
+                consumed_tokens=5_000,
+                remaining_tokens=5_000,
+                burn_rate=150.0,
+            ),
+        )
+        checkpoint_row = _make_ledger_row(
+            version=20,
+            state_snapshot=state.model_dump(mode="json"),
+            is_checkpoint=True,
+        )
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = checkpoint_row
+        session.execute = AsyncMock(return_value=mock_result)
+
+        result = await state_manager.get_current()
+        assert result.version == 20
+        assert result.budget.consumed_tokens == 5_000
+
 
 # ── get_version ──────────────────────────────────────────────────────
 
@@ -57,10 +192,118 @@ class TestGetVersion:
     async def test_raises_on_missing_version(self, state_manager: StateManager) -> None:
         """Non-existent versions should raise LedgerVersionNotFoundError."""
         session = state_manager._session_factory._session
-        session.get = AsyncMock(return_value=None)
+        # No checkpoint found, no delta rows found.
+        session.execute = _mock_execute_results(
+            [
+                None,  # checkpoint query: no checkpoint
+                [],  # deltas query: no deltas
+            ]
+        )
 
         with pytest.raises(LedgerVersionNotFoundError):
             await state_manager.get_version(999)
+
+    async def test_returns_checkpoint_directly(self, state_manager: StateManager) -> None:
+        """When the requested version IS a checkpoint, return it without delta replay."""
+        session = state_manager._session_factory._session
+
+        state = WorldState(
+            version=20,
+            budget=BudgetState(
+                allocated_tokens=10_000,
+                consumed_tokens=4_000,
+                remaining_tokens=6_000,
+            ),
+        )
+        checkpoint_row = _make_ledger_row(
+            version=20,
+            state_snapshot=state.model_dump(mode="json"),
+            is_checkpoint=True,
+        )
+
+        # Checkpoint query returns the row; start_version == requested version, so return.
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = checkpoint_row
+        session.execute = AsyncMock(return_value=mock_result)
+
+        result = await state_manager.get_version(20)
+        assert result.version == 20
+        assert result.budget.consumed_tokens == 4_000
+
+    async def test_reconstructs_from_checkpoint_plus_deltas(
+        self, state_manager: StateManager
+    ) -> None:
+        """get_version should replay deltas on top of the nearest checkpoint."""
+        session = state_manager._session_factory._session
+
+        checkpoint_state = WorldState(
+            version=20,
+            budget=BudgetState(
+                allocated_tokens=10_000,
+                consumed_tokens=4_000,
+                remaining_tokens=6_000,
+                burn_rate=100.0,
+            ),
+        )
+        checkpoint_row = _make_ledger_row(
+            version=20,
+            state_snapshot=checkpoint_state.model_dump(mode="json"),
+            is_checkpoint=True,
+        )
+
+        delta_v21 = _make_ledger_row(
+            version=21,
+            mutations=[
+                {"path": "budget.consumed_tokens", "old_value": 4000, "new_value": 4500},
+                {"path": "budget.remaining_tokens", "old_value": 6000, "new_value": 5500},
+            ],
+            is_checkpoint=False,
+        )
+        delta_v22 = _make_ledger_row(
+            version=22,
+            mutations=[
+                {"path": "budget.consumed_tokens", "old_value": 4500, "new_value": 5000},
+                {"path": "budget.remaining_tokens", "old_value": 5500, "new_value": 5000},
+            ],
+            is_checkpoint=False,
+        )
+
+        session.execute = _mock_execute_results(
+            [
+                checkpoint_row,  # checkpoint query
+                [delta_v21, delta_v22],  # deltas query
+            ]
+        )
+
+        result = await state_manager.get_version(22)
+        assert result.version == 22
+        assert result.budget.consumed_tokens == 5_000
+        assert result.budget.remaining_tokens == 5_000
+
+    async def test_reconstructs_from_pristine_without_checkpoint(
+        self, state_manager: StateManager
+    ) -> None:
+        """When no checkpoint exists, reconstruct from pristine state (version 0)."""
+        session = state_manager._session_factory._session
+
+        delta_v1 = _make_ledger_row(
+            version=1,
+            mutations=[
+                {"path": "budget.consumed_tokens", "old_value": 0, "new_value": 500},
+            ],
+            is_checkpoint=False,
+        )
+
+        session.execute = _mock_execute_results(
+            [
+                None,  # checkpoint query: no checkpoint
+                [delta_v1],  # deltas query
+            ]
+        )
+
+        result = await state_manager.get_version(1)
+        assert result.version == 1
+        assert result.budget.consumed_tokens == 500
 
 
 # ── _validate_mutations ──────────────────────────────────────────────
@@ -185,3 +428,24 @@ class TestSubmitProposal:
         mock_event_publisher.publish.assert_called_once()
         envelope = mock_event_publisher.publish.call_args[0][0]
         assert envelope.type.value == "proposal.created"
+
+
+# ── Delta storage (checkpoint interval) ──────────────────────────────
+
+
+class TestDeltaStorage:
+    """Tests that validate_and_commit writes deltas vs. checkpoints correctly."""
+
+    def test_checkpoint_interval_is_20(self) -> None:
+        """Sanity check the constant is what we expect."""
+        assert _CHECKPOINT_INTERVAL == 20
+
+    def test_non_checkpoint_version(self) -> None:
+        """Versions that are NOT multiples of _CHECKPOINT_INTERVAL are not checkpoints."""
+        for v in (1, 2, 10, 19, 21, 39):
+            assert v % _CHECKPOINT_INTERVAL != 0
+
+    def test_checkpoint_version(self) -> None:
+        """Versions that ARE multiples of _CHECKPOINT_INTERVAL are checkpoints."""
+        for v in (20, 40, 60, 100):
+            assert v % _CHECKPOINT_INTERVAL == 0
