@@ -25,15 +25,19 @@ The following ports must be free before starting infrastructure:
 | 8080 | Temporal UI |
 | 4222 | NATS (client connections) |
 | 8222 | NATS Monitoring |
+| 4317 | Jaeger OTLP (tracing) |
+| 16686 | Jaeger UI |
+| 9090 | Prometheus |
+| 3001 | Grafana |
 
 Check for port conflicts:
 
 ```bash
 # Linux
-ss -tlnp | grep -E '(5432|6379|7233|8080|4222|8222)'
+ss -tlnp | grep -E '(5432|6379|7233|8080|4222|8222|4317|16686|9090|3001)'
 
 # macOS
-lsof -iTCP -sTCP:LISTEN -P | grep -E '(5432|6379|7233|8080|4222|8222)'
+lsof -iTCP -sTCP:LISTEN -P | grep -E '(5432|6379|7233|8080|4222|8222|4317|16686|9090|3001)'
 ```
 
 ---
@@ -74,18 +78,33 @@ Alternatively, use the one-command setup script which handles everything from St
 
 ## Step 3: Environment Configuration
 
-If no `.env` file exists, create one from the example:
+The easiest approach is to use the setup script, which auto-generates secure credentials:
+
+```bash
+./scripts/dev-setup.sh
+```
+
+This creates `.env` from `.env.example` and generates random passwords for Postgres and Redis via `openssl rand -hex 16`.
+
+**Manual setup** (if you prefer):
 
 ```bash
 cp .env.example .env
+# Then edit .env and set REQUIRED values:
+#   POSTGRES_PASSWORD=<strong-password>
+#   ARCHITECT_PG_PASSWORD=<same-as-above>
+#   REDIS_PASSWORD=<strong-password>
+#   ARCHITECT_REDIS_PASSWORD=<same-as-above>
 ```
 
-The defaults in `.env.example` are configured for local development and work out of the box with the Docker Compose infrastructure. Key settings:
+Key settings:
 
-- `ARCHITECT_PG_HOST=localhost` / `ARCHITECT_PG_PORT=5432`
-- `ARCHITECT_REDIS_HOST=localhost` / `ARCHITECT_REDIS_PORT=6379`
-- `ARCHITECT_TEMPORAL_HOST=localhost` / `ARCHITECT_TEMPORAL_PORT=7233`
-- `ARCHITECT_CLAUDE_API_KEY` -- set this to your Anthropic API key for coding agent features
+- `POSTGRES_PASSWORD` / `ARCHITECT_PG_PASSWORD` -- **Required.** Must match. Used by docker-compose and Python services
+- `REDIS_PASSWORD` / `ARCHITECT_REDIS_PASSWORD` -- **Required.** Must match. Redis authentication
+- `ARCHITECT_GATEWAY_API_KEYS_RAW` -- Comma-separated API keys for gateway auth (optional for local dev)
+- `ARCHITECT_GATEWAY_AUTH_ENABLED` -- Set to `false` to skip auth locally (default: `true`)
+- `ARCHITECT_CLAUDE_API_KEY` -- Set to your Anthropic API key for coding agent features
+- `OTEL_EXPORTER_OTLP_ENDPOINT` -- Set to `http://jaeger:4317` to enable tracing (optional)
 
 ---
 
@@ -98,10 +117,14 @@ make infra-up
 This runs `docker compose -f infra/docker-compose.yml up -d`, starting:
 
 - **PostgreSQL 16** -- primary database (with health check)
-- **Redis 7** -- caching and state snapshots (append-only, with health check)
+- **Redis 7** -- caching and event streams (requires password, append-only)
 - **Temporal** -- workflow orchestration (auto-setup image, depends on Postgres)
 - **Temporal UI** -- web dashboard for workflow visibility
 - **NATS** -- event bus with JetStream enabled (with health check)
+- **Jaeger** -- distributed tracing (OTLP on 4317, UI on 16686)
+- **Prometheus** -- metrics collection (scrapes all services on 9090)
+- **Grafana** -- metrics dashboards (UI on 3001)
+- **Docker Socket Proxy** -- restricted Docker API access for sandbox security
 
 Wait for all services to become healthy:
 
@@ -176,9 +199,12 @@ bun run build  # Output in apps/dashboard/dist/
 ## Accessing UIs
 
 | UI | URL | Description |
-|---|---|---|
-| Temporal UI | http://localhost:8080 | View workflows, task history, and failures |
-| NATS Monitoring | http://localhost:8222 | NATS server stats, connections, JetStream info |
+| --- | --- | --- |
+| Temporal UI | <http://localhost:8080> | View workflows, task history, and failures |
+| Jaeger UI | <http://localhost:16686> | Distributed tracing across services |
+| Prometheus | <http://localhost:9090> | Metrics queries and alerting |
+| Grafana | <http://localhost:3001> | Metrics dashboards (admin/admin) |
+| NATS Monitoring | <http://localhost:8222> | NATS server stats, connections, JetStream info |
 
 ---
 

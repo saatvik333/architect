@@ -77,6 +77,8 @@ flowchart TD
 - `EventLog` -- Append-only PostgreSQL event log with idempotent writes
 - `StateCache` -- Redis-backed cache for hot state reads
 
+**Delta-based storage:** Ledger rows store mutation diffs (`mutations` JSONB column) instead of full state snapshots. Full checkpoint snapshots are written every 20 versions (`is_checkpoint` flag). State reconstruction replays diffs from the nearest checkpoint. This eliminates quadratic storage growth.
+
 **Communication:** Publishes events via Redis Streams (`proposal.created`, `proposal.accepted`, `proposal.rejected`, `ledger.updated`). All other components read state through the Ledger's API or Temporal activities.
 
 **Implementation:** `services/world-state-ledger/` -- `state_manager.py`, `event_log.py`, `cache.py`, `models.py`, FastAPI routes, Temporal activities and worker.
@@ -89,9 +91,10 @@ flowchart TD
 
 **Key abstractions:**
 
-- `TaskDAG` -- NetworkX-backed directed acyclic graph where each node stores a `Task` and edges represent dependency relationships
-- `TaskDecomposer` -- Converts a spec dict into a list of `Task` objects. Phase 1 uses deterministic decomposition (impl -> test -> review per module). Phase 2+ uses LLM-assisted decomposition
-- `TaskScheduler` -- Picks the highest-priority ready task, manages lifecycle transitions (`PENDING -> RUNNING -> COMPLETED/FAILED`), enforces valid state transitions, handles retry logic
+- `TaskDAG` -- NetworkX-backed directed acyclic graph where each node stores a `Task` and edges represent dependency relationships. Supports `from_tasks()` reconstruction from persisted tasks for crash recovery
+- `TaskDecomposer` -- Converts a spec dict into a list of `Task` objects. Phase 1 uses deterministic decomposition (impl -> test -> review per module). Phase 2+ uses LLM-assisted decomposition. Handles markdown-fenced JSON from LLM responses
+- `TaskScheduler` -- Picks the highest-priority ready task, manages lifecycle transitions (`PENDING -> RUNNING -> COMPLETED/FAILED`), enforces valid state transitions, handles retry logic. Supports `load_from_db()` for crash recovery
+- `DistributedSchedulerLock` -- Redis-backed distributed lock for horizontal scaling. Uses SETNX for atomic task claiming, Redis sets for distributed completed-task tracking. Falls back to in-memory `asyncio.Lock` for single-instance deployments
 - `Task` -- Frozen Pydantic model with `TaskId`, `TaskType`, `AgentType`, `ModelTier`, priority, dependencies, budget, retry history
 
 **Communication:** Publishes task lifecycle events (`task.created`, `task.started`, `task.completed`, `task.failed`, `task.retried`). Reads from the World State Ledger. Persists to Postgres via `TaskRepository`.
@@ -106,8 +109,8 @@ flowchart TD
 
 **Key abstractions:**
 
-- `DockerExecutor` -- Creates containers, runs commands, writes/reads files via tar archives, destroys containers. Each sandbox session maps to one container
-- `SandboxSession` -- Tracks container ID, status, audit log, resource usage, and timestamps
+- `DockerExecutor` -- Creates containers, runs commands, writes/reads files via tar archives, destroys containers. Each sandbox session maps to one container. Supports optional DB persistence via `session_factory` and crash recovery via `load_active_sessions_from_db()`. Connects through a Docker socket proxy in production (restricting API surface to container lifecycle + exec)
+- `SandboxSession` -- Tracks container ID, status, audit log, resource usage, and timestamps. Persisted to the `sandbox_sessions` DB table for crash recovery
 - `SandboxSpec` -- Defines the sandbox configuration: base image, resource limits, task/agent IDs
 - `SecurityValidator` -- Rejects dangerous commands (e.g. network access, privilege escalation) and suspicious file paths before execution
 - `ResourceLimits` -- CPU, memory, disk, and timeout constraints applied to containers
@@ -403,7 +406,7 @@ Direct state mutation by agents would create race conditions and make debugging 
 
 - **Audit trail:** Every state change has a proposal ID, agent ID, rationale, and timestamp
 - **Optimistic concurrency:** The `old_value` check in each mutation prevents lost updates when multiple agents try to modify the same field
-- **Rollback-friendly:** Since every ledger version is a full snapshot, point-in-time state recovery is trivial
+- **Rollback-friendly:** State can be reconstructed at any version by replaying diffs from the nearest checkpoint
 - **Budget enforcement:** The validator rejects any proposal that would drive `remaining_tokens` below zero
 
 ### Why Docker sandboxing
@@ -412,9 +415,10 @@ Generated code is untrusted by definition. Docker containers provide:
 
 - **Filesystem isolation:** Code runs in `/workspace` inside the container; the host filesystem is never exposed
 - **Resource limits:** CPU, memory, and timeout constraints prevent runaway processes
-- **Security scanning:** Commands are validated against a blocklist before execution (no network access, no privilege escalation, no host mounts)
+- **Security scanning:** Commands are validated against an allowlist before execution (no network access, no privilege escalation, no host mounts)
 - **Reproducibility:** Each sandbox starts from a known base image with deterministic state
 - **User isolation:** Commands run as UID 1000 (non-root) inside the container
+- **Docker socket proxy:** Production deployments use Tecnativa docker-socket-proxy to restrict Docker API access (only container lifecycle + exec; images, volumes, networks, swarm blocked)
 
 ### Why Pydantic frozen models
 
@@ -426,3 +430,49 @@ All domain models (`Task`, `Proposal`, `StateMutation`, `EvaluationReport`, etc.
 - **Correctness:** Eliminates a large class of bugs where shared mutable state is modified in unexpected order
 
 The one exception is `WorldState`, which inherits from `MutableBase` because it serves as an accumulator that is built up through successive mutations before being committed as a frozen ledger snapshot.
+
+---
+
+## Security Architecture
+
+### API Authentication
+
+The API Gateway enforces Bearer token authentication on all non-health endpoints (ADR-005). Keys are configured via `ARCHITECT_GATEWAY_API_KEYS_RAW` (comma-separated). Constant-time comparison via `hmac.compare_digest()` prevents timing attacks. Health and OpenAPI endpoints are exempt. Auth can be disabled for local dev via `ARCHITECT_GATEWAY_AUTH_ENABLED=false`.
+
+### Prompt Injection Mitigation
+
+User-provided text (specs, task descriptions) is wrapped in `<user_input>` delimiter tags before inclusion in LLM prompts. A detection function scans for common injection markers (e.g. "IGNORE PREVIOUS INSTRUCTIONS") and logs warnings. Post-generation code scanning checks for suspicious patterns (dangerous function calls, outbound network calls) as defense-in-depth. The sandbox is the enforcement layer.
+
+### Credential Management
+
+No hardcoded credentials anywhere. Docker Compose uses `${VAR:?error}` syntax for fail-fast on missing secrets. `scripts/dev-setup.sh` auto-generates strong passwords via `openssl rand -hex 16`. Redis requires authentication (`--requirepass`). Credentials are redacted from log output.
+
+### Rate Limiting & Request Controls
+
+The API Gateway includes sliding-window rate limiting (default 60 req/min, keyed by API key or client IP), request body size limits (1MB default, returns 413), and security headers (CSP, HSTS in non-dev, X-Frame-Options, X-Content-Type-Options).
+
+---
+
+## Observability
+
+### Tracing
+
+The `architect-observability` library provides one-call setup for OpenTelemetry tracing on any FastAPI service. Traces are exported via OTLP gRPC to Jaeger (port 4317). FastAPI requests and outbound httpx calls are auto-instrumented. The Jaeger UI is available at http://localhost:16686.
+
+### Metrics
+
+Prometheus metrics are exposed on `/metrics` for every instrumented service via `prometheus-fastapi-instrumentator`. Prometheus scrapes all 10 services (gateway + 9 backends) every 15 seconds. Grafana (port 3001) provides visualization.
+
+### Logging
+
+All services use `structlog` with ISO timestamps, context variables, and configurable JSON output. Logs go to stderr.
+
+### Infrastructure
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| Jaeger | 16686 (UI), 4317 (OTLP) | Distributed tracing |
+| Prometheus | 9090 | Metrics collection |
+| Grafana | 3001 | Metrics dashboards |
+| Temporal UI | 8080 | Workflow visibility |
+| NATS Monitoring | 8222 | Message bus health |

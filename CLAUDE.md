@@ -15,20 +15,39 @@ A multi-agent system that replaces the software engineering loop: specify → bu
 - Postgres 16 (with pgvector extension), Redis 7, Temporal, NATS
 - FastAPI, SQLAlchemy (async), Alembic
 - Anthropic SDK (Claude API)
-- Docker for sandboxing
+- Docker for sandboxing (via Tecnativa docker-socket-proxy in production)
 - Bun (for dashboard app JS/TS tooling — never use npm)
 - tree-sitter (multi-language AST parsing in Codebase Comprehension)
 - sentence-transformers (code embedding generation)
 - PromptFoo (LLM prompt regression testing)
+- OpenTelemetry + Jaeger (distributed tracing)
+- Prometheus + Grafana (metrics and dashboards)
+
+## Shared Libraries
+
+- `architect-common` — types, errors, config, logging (structlog)
+- `architect-db` — async SQLAlchemy ORM, repositories, Alembic migrations
+- `architect-events` — Redis Streams pub/sub, event envelope schema
+- `architect-llm` — Anthropic SDK wrapper, cost tracking, rate limiting
+- `architect-observability` — OpenTelemetry tracing + Prometheus metrics setup
+- `architect-sandbox-client` — typed HTTP client for sandbox service
+- `architect-testing` — test factories and mock implementations
 
 ## Conventions
 - All domain models use Pydantic v2 with `frozen=True` (immutable by default)
 - Branded ID types: `TaskId`, `AgentId`, `ProposalId`, `EventId` (NewType with prefixes)
+- ORM enum columns use `sa.Enum(MyEnum, native_enum=False)` — not raw Text
 - Services never import other services — only shared libs
 - State mutations go through the proposal pipeline (agent → proposal → validator → commit)
+- Ledger uses delta-based storage (mutations as diffs, checkpoints every 20 versions)
 - Every service has `temporal/` (workflows, activities, worker) and `api/` (FastAPI routes) sub-packages
 - Use `structlog` for logging, OpenTelemetry for tracing
+- Instrument new services with `init_observability(app, "service-name")` from `architect-observability`
+- No hardcoded credentials — use env vars with `${VAR:?error}` fail-fast syntax
+- API Gateway requires Bearer token auth (exempt: /health, /docs)
+- User input in LLM prompts must be wrapped in `<user_input>` delimiter tags
 - Tests: pytest with `--import-mode=importlib`, `asyncio_mode=auto`
+- `ARCHITECT_PG_PASSWORD` env var is required (no default) — use `scripts/dev-setup.sh` to generate
 
 ## Commands
 - `make install` — install all packages
