@@ -258,15 +258,24 @@ init_observability(app, "api-gateway")
 
 @app.exception_handler(httpx.HTTPStatusError)
 async def http_status_error_handler(_request: Request, exc: httpx.HTTPStatusError) -> JSONResponse:
-    """Return a generic error to the client; log upstream details server-side."""
+    """Return a generic error to the client; log upstream details server-side only."""
+    upstream_body = exc.response.text
     logger.error(
         "upstream HTTP error",
         status_code=exc.response.status_code,
-        upstream_body=exc.response.text,
+        # Truncate upstream body in logs to avoid leaking large payloads with
+        # potentially sensitive data.
+        upstream_body=upstream_body[:500] if upstream_body else "",
         url=str(exc.request.url),
     )
+    # Map upstream status to a safe client-facing status.  Preserve 4xx codes
+    # so the client knows whether it was a bad request vs not-found, but never
+    # expose raw 5xx — always return 502 (Bad Gateway) for upstream server errors.
+    upstream_status = exc.response.status_code
+    client_status = 502 if upstream_status >= 500 else upstream_status
+
     return JSONResponse(
-        status_code=exc.response.status_code,
+        status_code=client_status,
         content={"detail": "An error occurred while processing the request."},
     )
 

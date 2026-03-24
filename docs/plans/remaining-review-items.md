@@ -218,7 +218,7 @@ The resolution commit addressed:
 
 ---
 
-## Phase D: Testing Gaps (Week 4-5)
+## Phase D: Testing Gaps (Week 4-5) — COMPLETED
 
 ### D1. Temporal Workflow Tests (T-C1)
 
@@ -284,7 +284,7 @@ The resolution commit addressed:
 
 ---
 
-## Phase E: Code Quality & Modernization (Ongoing)
+## Phase E: Code Quality & Modernization (Ongoing) — PARTIALLY COMPLETED
 
 ### E1. API Versioning (A-H3)
 

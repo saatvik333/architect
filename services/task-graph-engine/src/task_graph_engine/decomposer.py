@@ -174,9 +174,15 @@ class TaskDecomposer:
         response = await self._llm_client.generate(request)
 
         # Strip markdown code fences that LLMs sometimes add despite instructions.
+        # Handles fences at start/end as well as fences preceded by explanatory text.
         content = response.content.strip()
-        content = re.sub(r"^```(?:json)?\s*\n?", "", content.strip())
-        content = re.sub(r"\n?```\s*$", "", content.strip())
+        fence_match = re.search(r"```(?:json)?\s*\n(.*?)\n```", content, re.DOTALL)
+        if fence_match:
+            content = fence_match.group(1).strip()
+        else:
+            # Fallback: strip leading/trailing fences if present
+            content = re.sub(r"^```(?:json)?\s*\n?", "", content)
+            content = re.sub(r"\n?```\s*$", "", content.strip())
 
         try:
             raw_tasks: list[dict[str, Any]] = json.loads(content)

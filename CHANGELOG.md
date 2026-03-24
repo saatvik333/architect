@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase D Testing & Phase E Code Quality
+
+- **Temporal activity tests** (D1) — 40 new tests across 4 services (task-graph, coding-agent, eval-engine, world-state-ledger), covering all critical activity functions
+- **Unit test gaps** (D5) — 21 new tests for CodeGenerator._parse_files edge cases, error hierarchy, and enum definitions
+- **TaskDAG persistence** (E4) — `TaskDAG.from_tasks()` reconstruction from DB, `TaskScheduler.load_from_db()` for crash recovery with paginated loading
+- **TaskDecomposer markdown fix** (M-7) — JSON extraction now handles LLM responses with markdown code fences
+- **Gateway error info leakage fix** (S-M6) — upstream 5xx mapped to 502, response body truncated in logs
+
 ### Added — Phase C Observability & Operations
 
 - **architect-observability library** — new shared lib with OpenTelemetry tracing (OTLP exporter) and Prometheus metrics (FastAPI instrumentator with /metrics endpoint)

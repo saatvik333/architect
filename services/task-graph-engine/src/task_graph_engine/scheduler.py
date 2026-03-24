@@ -5,15 +5,23 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from architect_common.enums import EvalVerdict, EventType, StatusEnum
+from architect_common.enums import (
+    AgentType,
+    EvalVerdict,
+    EventType,
+    ModelTier,
+    StatusEnum,
+    TaskType,
+)
 from architect_common.errors import InvalidTransitionError
 from architect_common.logging import get_logger
 from architect_common.types import AgentId, TaskId, utcnow
 from task_graph_engine.distributed_lock import DistributedSchedulerLock
 from task_graph_engine.graph import TaskDAG
-from task_graph_engine.models import Task, TaskRetryRecord, TaskTimestamps
+from task_graph_engine.models import Task, TaskBudget, TaskRetryRecord, TaskTimestamps
 
 if TYPE_CHECKING:
+    from architect_db.models.task import Task as TaskRow
     from architect_db.repositories.task_repo import TaskRepository
     from architect_events.publisher import EventPublisher
 
@@ -51,6 +59,96 @@ class TaskScheduler:
         self._completed: set[TaskId] = set()
         self._distributed_lock = distributed_lock or DistributedSchedulerLock()
         self._schedule_lock = asyncio.Lock()  # keep as fallback
+
+    # ── Startup / Recovery ────────────────────────────────────────
+
+    async def load_from_db(self) -> int:
+        """Load the task graph and completed set from the database.
+
+        Call this once at startup to reconstruct state after a service
+        restart.  All persisted tasks are fetched (paginated in batches of
+        1 000), converted to domain models, and fed to
+        :meth:`TaskDAG.from_tasks` to rebuild the in-memory graph.
+
+        Returns:
+            The number of tasks loaded.
+        """
+        # Paginate through the repository to avoid the 1 000-row cap.
+        all_rows: list[TaskRow] = []
+        batch_size = 1000
+        offset = 0
+        while True:
+            batch = await self._task_repo.list_all(limit=batch_size, offset=offset)
+            if not batch:
+                break
+            all_rows.extend(batch)
+            if len(batch) < batch_size:
+                break
+            offset += batch_size
+
+        if not all_rows:
+            logger.info("dag_loaded_from_db", task_count=0, completed=0)
+            return 0
+
+        # Convert ORM rows → domain Task models.
+        domain_tasks: list[Task] = []
+        for row in all_rows:
+            domain_task = Task(
+                id=TaskId(row.id),
+                type=row.type if isinstance(row.type, TaskType) else TaskType(row.type),
+                agent_type=(
+                    row.agent_type
+                    if isinstance(row.agent_type, AgentType)
+                    else AgentType(row.agent_type)
+                    if row.agent_type
+                    else AgentType.CODER
+                ),
+                model_tier=(
+                    row.model_tier
+                    if isinstance(row.model_tier, ModelTier)
+                    else ModelTier(row.model_tier)
+                    if row.model_tier
+                    else ModelTier.TIER_2
+                ),
+                status=(
+                    row.status if isinstance(row.status, StatusEnum) else StatusEnum(row.status)
+                ),
+                priority=row.priority or 0,
+                dependencies=[TaskId(d) for d in (row.dependencies or [])],
+                dependents=[TaskId(d) for d in (getattr(row, "dependents", None) or [])],
+                budget=TaskBudget(**(row.budget or {})) if row.budget else TaskBudget(),
+                assigned_agent=row.assigned_agent,
+                current_attempt=row.current_attempt or 0,
+                timestamps=TaskTimestamps(
+                    created_at=row.created_at,
+                    started_at=getattr(row, "started_at", None),
+                    completed_at=getattr(row, "completed_at", None),
+                ),
+                verdict=(
+                    row.verdict
+                    if isinstance(row.verdict, EvalVerdict) or row.verdict is None
+                    else EvalVerdict(row.verdict)
+                ),
+                error_message=row.error_message,
+            )
+            domain_tasks.append(domain_task)
+
+        # Reconstruct DAG from domain models.
+        self._dag = TaskDAG.from_tasks(domain_tasks)
+
+        # Rebuild completed set.
+        self._completed = {t.id for t in domain_tasks if t.status == StatusEnum.COMPLETED}
+
+        # Sync with distributed lock so other scheduler instances agree.
+        for tid in self._completed:
+            await self._distributed_lock.mark_completed(str(tid))
+
+        logger.info(
+            "dag_loaded_from_db",
+            task_count=len(domain_tasks),
+            completed=len(self._completed),
+        )
+        return len(domain_tasks)
 
     @property
     def dag(self) -> TaskDAG:

@@ -188,6 +188,37 @@ class TaskDAG:
 
         return errors
 
+    # ── Reconstruction ────────────────────────────────────────────
+
+    @classmethod
+    def from_tasks(cls, tasks: list[Task]) -> TaskDAG:
+        """Reconstruct a TaskDAG from a list of persisted tasks.
+
+        Each task's ``dependencies`` field contains the IDs of its prerequisite
+        tasks.  This method rebuilds the :mod:`networkx` ``DiGraph`` from those
+        relationships, silently skipping dependency edges that reference tasks
+        not present in *tasks*.
+
+        Args:
+            tasks: Domain :class:`Task` instances (e.g. loaded from the DB).
+
+        Returns:
+            A fully wired :class:`TaskDAG`.
+        """
+        dag = cls()
+
+        # First pass: add all task nodes.
+        for task in tasks:
+            dag._graph.add_node(task.id, task=task)
+
+        # Second pass: add dependency edges.
+        for task in tasks:
+            for dep_id in task.dependencies:
+                if dag._graph.has_node(dep_id):
+                    dag._graph.add_edge(dep_id, task.id)
+
+        return dag
+
     # ── Export ──────────────────────────────────────────────────────
 
     def to_task_graph(self) -> TaskGraph:
