@@ -87,19 +87,28 @@ class TestConcurrentProposals:
         assert len(errors) == 1, f"Expected exactly 1 error, got {len(errors)}: {results}"
 
     @pytest.mark.asyncio
-    async def test_sequential_proposals_both_succeed(self, state_manager) -> None:
-        """Sequential proposals to different fields should both succeed."""
+    async def test_sequential_proposal_succeeds(self, state_manager) -> None:
+        """A proposal using the current state's values should succeed."""
         from architect_common.types import AgentId, ProposalId, TaskId
         from world_state_ledger.models import Proposal, StateMutation
+
+        # Read current state to get actual value (may have been modified by prior tests)
+        current = await state_manager.get_current()
+        current_data = current.model_dump(mode="json")
+        current_tokens = current_data.get("budget", {}).get("consumed_tokens", 0)
 
         proposal_a = Proposal(
             id=ProposalId("prop-seq-a"),
             agent_id=AgentId("agent-1"),
             task_id=TaskId("task-1"),
             mutations=[
-                StateMutation(path="budget.consumed_tokens", old_value=0, new_value=100),
+                StateMutation(
+                    path="budget.consumed_tokens",
+                    old_value=current_tokens,
+                    new_value=current_tokens + 50,
+                ),
             ],
-            rationale="First sequential",
+            rationale="Sequential proposal using current state",
         )
 
         await state_manager.submit_proposal(proposal_a)
