@@ -8,6 +8,7 @@ dependencies = [
     "architect-db",
     "architect-events",
     "architect-llm",
+    "architect-observability",
     "temporalio>=1.9",
     "fastapi>=0.115",
     "uvicorn>=0.32",
@@ -27,3 +28,4 @@ architect-common = { workspace = true }
 architect-db = { workspace = true }
 architect-events = { workspace = true }
 architect-llm = { workspace = true }
+architect-observability = { workspace = true }

@@ -7,6 +7,7 @@ dependencies = [
     "architect-common",
     "architect-llm",
     "architect-events",
+    "architect-observability",
     "temporalio>=1.9",
     "fastapi>=0.115",
     "uvicorn>=0.32",
@@ -23,3 +24,4 @@ packages = ["src/multi_model_router"]
 architect-common = { workspace = true }
 architect-llm = { workspace = true }
 architect-events = { workspace = true }
+architect-observability = { workspace = true }

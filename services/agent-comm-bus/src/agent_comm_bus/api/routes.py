@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -14,6 +15,8 @@ from architect_common.enums import HealthStatus
 
 router = APIRouter()
 
+_SERVICE_STARTED_AT = time.monotonic()
+
 
 # ── Request / Response schemas ────────────────────────────────────────
 
@@ -23,6 +26,7 @@ class HealthResponse(BaseModel):
 
     service: str = "agent-comm-bus"
     status: HealthStatus
+    uptime_seconds: float = 0.0
 
 
 class PublishRequest(BaseModel):
@@ -46,13 +50,19 @@ class PublishResponse(BaseModel):
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Service health check endpoint."""
-    return HealthResponse(status=HealthStatus.HEALTHY)
+    return HealthResponse(
+        status=HealthStatus.HEALTHY,
+        uptime_seconds=round(time.monotonic() - _SERVICE_STARTED_AT, 1),
+    )
 
 
 @router.get("/api/v1/bus/health", response_model=HealthResponse)
 async def bus_health() -> HealthResponse:
     """Bus-specific health check endpoint."""
-    return HealthResponse(status=HealthStatus.HEALTHY)
+    return HealthResponse(
+        status=HealthStatus.HEALTHY,
+        uptime_seconds=round(time.monotonic() - _SERVICE_STARTED_AT, 1),
+    )
 
 
 @router.get("/api/v1/bus/stats", response_model=MessageStats)

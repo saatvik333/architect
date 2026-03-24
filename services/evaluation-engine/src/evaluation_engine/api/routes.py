@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +14,8 @@ from evaluation_engine.api.dependencies import get_evaluator
 from evaluation_engine.evaluator import Evaluator
 
 router = APIRouter()
+
+_SERVICE_STARTED_AT = time.monotonic()
 
 # ── In-memory report store (production would use a database) ──────────
 _report_store: dict[str, dict[str, Any]] = {}
@@ -42,6 +45,7 @@ class HealthResponse(BaseModel):
 
     service: str = "evaluation-engine"
     status: HealthStatus
+    uptime_seconds: float = 0.0
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────
@@ -84,4 +88,7 @@ async def get_report(task_id: str) -> dict[str, Any]:
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Service health check endpoint."""
-    return HealthResponse(status=HealthStatus.HEALTHY)
+    return HealthResponse(
+        status=HealthStatus.HEALTHY,
+        uptime_seconds=round(time.monotonic() - _SERVICE_STARTED_AT, 1),
+    )

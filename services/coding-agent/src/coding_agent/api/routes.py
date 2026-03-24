@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections import OrderedDict
 from typing import Any
 
@@ -20,6 +21,8 @@ from coding_agent.models import (
 )
 
 router = APIRouter()
+
+_SERVICE_STARTED_AT = time.monotonic()
 
 # ── In-memory run store (production would use a database) ─────────────
 _MAX_RUN_STORE_SIZE = 1000
@@ -72,6 +75,7 @@ class HealthResponse(BaseModel):
 
     service: str = "coding-agent"
     status: HealthStatus
+    uptime_seconds: float = 0.0
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────
@@ -136,4 +140,7 @@ async def get_agent_status(agent_id: str) -> AgentStatusResponse:
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Service health check endpoint."""
-    return HealthResponse(status=HealthStatus.HEALTHY)
+    return HealthResponse(
+        status=HealthStatus.HEALTHY,
+        uptime_seconds=round(time.monotonic() - _SERVICE_STARTED_AT, 1),
+    )

@@ -239,7 +239,7 @@ Each layer receives a sandbox session ID, runs its checks inside the sandbox, an
   - `FAIL_HARD`: pytest collection/import errors (exit code >= 2) -- fatal
 - Parses pytest output to extract individual failure details (file path, test name, message)
 
-**Future layers** (Phase 2+): `integration_tests`, `adversarial`, `spec_compliance`, `architecture`, `regression`
+**Additional layers** (implemented in Phase 2): `integration_tests`, `adversarial`, `spec_compliance`, `architecture`, `regression` — see [Phase 2 Design](phase-2-design.md) for details.
 
 #### Verdict System
 
@@ -534,13 +534,13 @@ erDiagram
 
 All infrastructure is defined in `infra/docker-compose.yml`:
 
-| Service      | Image                        | Port  | Purpose                           |
-|--------------|------------------------------|-------|-----------------------------------|
-| Postgres 16  | `pgvector/pgvector:pg16`     | 5432  | Primary data store (with pgvector)|
-| Redis 7      | `redis:7`                    | 6379  | Cache and event streams           |
-| Temporal     | `temporalio/auto-setup`      | 7233  | Workflow orchestration            |
-| Temporal UI  | `temporalio/ui`              | 8080  | Workflow monitoring dashboard     |
-| NATS         | `nats:latest`                | 4222  | Message bus (future phases)       |
+| Service      | Image                        | Port  | Purpose                              |
+|--------------|------------------------------|-------|--------------------------------------|
+| Postgres 16  | `pgvector/pgvector:pg16`     | 5432  | Primary data store (with pgvector)   |
+| Redis 7      | `redis:7`                    | 6379  | Cache and event streams              |
+| Temporal     | `temporalio/auto-setup`      | 7233  | Workflow orchestration               |
+| Temporal UI  | `temporalio/ui`              | 8080  | Workflow monitoring dashboard        |
+| NATS         | `nats:latest`                | 4222  | Message bus (Phase 2 Agent Comm Bus) |
 
 ### Configuration
 

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
 
 from architect_common.logging import get_logger, setup_logging
+from architect_observability import init_observability, shutdown_observability
 from task_graph_engine.api.routes import router
 from task_graph_engine.config import TaskGraphEngineConfig
 
@@ -16,10 +17,11 @@ logger = get_logger(component="task_graph_engine_service")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Manage startup/shutdown lifecycle for the service."""
     logger.info("Task Graph Engine starting up")
     yield
+    shutdown_observability(app)
     logger.info("Task Graph Engine shutting down")
 
     # Clean up the event publisher if it was created.
@@ -52,6 +54,7 @@ def create_app(config: TaskGraphEngineConfig | None = None) -> FastAPI:
     )
 
     app.include_router(router, tags=["tasks"])
+    init_observability(app, "task-graph-engine")
 
     return app
 

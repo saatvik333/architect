@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -13,6 +14,8 @@ from world_state_ledger.api.dependencies import EventLogDep, StateManagerDep
 from world_state_ledger.models import Proposal
 
 router = APIRouter()
+
+_SERVICE_STARTED_AT = time.monotonic()
 
 
 # ── State endpoints ──────────────────────────────────────────────────
@@ -94,6 +97,10 @@ async def query_events(
 
 
 @router.get("/health", summary="Health check")
-async def health_check() -> dict[str, str]:
+async def health_check() -> dict[str, str | float]:
     """Return service health status."""
-    return {"status": HealthStatus.HEALTHY, "service": "world-state-ledger"}
+    return {
+        "status": HealthStatus.HEALTHY,
+        "service": "world-state-ledger",
+        "uptime_seconds": round(time.monotonic() - _SERVICE_STARTED_AT, 1),
+    }

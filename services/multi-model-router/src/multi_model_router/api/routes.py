@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
@@ -20,6 +22,8 @@ from .dependencies import get_cost_collector, get_router, get_scorer
 
 router = APIRouter()
 
+_SERVICE_STARTED_AT = time.monotonic()
+
 
 # ── Request / Response schemas ─────────────────────────────────────
 
@@ -36,6 +40,7 @@ class HealthResponse(BaseModel):
 
     service: str = "multi-model-router"
     status: HealthStatus
+    uptime_seconds: float = 0.0
 
 
 # ── Endpoints ───────────────────────────────────────────────────────
@@ -99,4 +104,7 @@ async def get_stats(
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Service health check endpoint."""
-    return HealthResponse(status=HealthStatus.HEALTHY)
+    return HealthResponse(
+        status=HealthStatus.HEALTHY,
+        uptime_seconds=round(time.monotonic() - _SERVICE_STARTED_AT, 1),
+    )

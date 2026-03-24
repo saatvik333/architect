@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,6 +18,8 @@ from spec_engine.stakeholder_simulator import StakeholderSimulator
 from spec_engine.validator import SpecValidator
 
 router = APIRouter()
+
+_SERVICE_STARTED_AT = time.monotonic()
 
 # ── Spec store — in-memory for Phase 2, to be replaced with Postgres in Phase 3 ──
 _spec_store: dict[str, dict[str, Any]] = {}
@@ -60,6 +63,7 @@ class HealthResponse(BaseModel):
 
     service: str = "spec-engine"
     status: HealthStatus
+    uptime_seconds: float = 0.0
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────
@@ -179,4 +183,7 @@ async def review_spec(
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Service health check endpoint."""
-    return HealthResponse(status=HealthStatus.HEALTHY)
+    return HealthResponse(
+        status=HealthStatus.HEALTHY,
+        uptime_seconds=round(time.monotonic() - _SERVICE_STARTED_AT, 1),
+    )

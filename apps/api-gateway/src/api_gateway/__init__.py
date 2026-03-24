@@ -12,6 +12,7 @@ from functools import lru_cache
 from typing import Any, ClassVar
 
 import httpx
+import structlog
 from fastapi import Depends, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -219,14 +220,22 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
-    """Generate a unique request ID for every request and set it on the response."""
+    """Generate a unique request ID for every request and set it on the response.
+
+    Also binds the request ID to structlog context vars so all log messages
+    emitted during request processing carry the ``request_id`` field.
+    """
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         request_id = request.headers.get("X-Request-ID") or str(_uuid.uuid4())
         request.state.request_id = request_id
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
-        return response
+        structlog.contextvars.bind_contextvars(request_id=request_id)
+        try:
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = request_id
+            return response
+        finally:
+            structlog.contextvars.unbind_contextvars("request_id")
 
 
 # ── Register middleware ────────────────────────────────────────────

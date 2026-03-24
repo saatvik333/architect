@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from agent_comm_bus.api.dependencies import cleanup, get_config
 from agent_comm_bus.api.routes import router
 from architect_common.logging import setup_logging
+from architect_observability import init_observability, shutdown_observability
 
 
 @asynccontextmanager
@@ -18,6 +19,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     config = get_config()
     setup_logging(log_level=config.log_level)
     yield
+    shutdown_observability(app)
     await cleanup()
 
 
@@ -30,6 +32,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(router)
+    init_observability(app, "agent-comm-bus")
     return app
 
 

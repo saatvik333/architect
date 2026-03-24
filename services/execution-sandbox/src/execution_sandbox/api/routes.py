@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,6 +16,8 @@ from execution_sandbox.models import SandboxSpec
 from .dependencies import get_executor
 
 router = APIRouter()
+
+_SERVICE_STARTED_AT = time.monotonic()
 
 
 # ── Request / response schemas ───────────────────────────────────────
@@ -38,8 +41,10 @@ class ReadFilesRequest(BaseModel):
 
 
 class HealthResponse(BaseModel):
+    service: str = "execution-sandbox"
     status: HealthStatus
     active_sandboxes: int = 0
+    uptime_seconds: float = 0.0
 
 
 class SandboxResponse(BaseModel):
@@ -197,4 +202,5 @@ async def health_check(executor: ExecutorDep) -> HealthResponse:
     return HealthResponse(
         status=HealthStatus.HEALTHY,
         active_sandboxes=active,
+        uptime_seconds=round(time.monotonic() - _SERVICE_STARTED_AT, 1),
     )

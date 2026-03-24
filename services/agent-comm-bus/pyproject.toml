@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "architect-common",
     "architect-events",
+    "architect-observability",
     "nats-py>=2.7",
     "fastapi>=0.115",
     "uvicorn>=0.32",
@@ -21,3 +22,4 @@ packages = ["src/agent_comm_bus"]
 [tool.uv.sources]
 architect-common = { workspace = true }
 architect-events = { workspace = true }
+architect-observability = { workspace = true }

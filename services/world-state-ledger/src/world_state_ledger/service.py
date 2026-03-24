@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
 import redis.asyncio as aioredis
@@ -24,7 +24,7 @@ logger = get_logger(component="world_state_ledger.service")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan: initialise and tear down infrastructure."""
     config: WorldStateLedgerConfig = app.state.config
 

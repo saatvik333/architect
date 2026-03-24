@@ -7,6 +7,7 @@ dependencies = [
     "architect-common",
     "architect-events",
     "architect-llm",
+    "architect-observability",
     "architect-sandbox-client",
     "temporalio>=1.9",
     "fastapi>=0.115",
@@ -24,4 +25,5 @@ packages = ["src/evaluation_engine"]
 architect-common = { workspace = true }
 architect-events = { workspace = true }
 architect-llm = { workspace = true }
+architect-observability = { workspace = true }
 architect-sandbox-client = { workspace = true }

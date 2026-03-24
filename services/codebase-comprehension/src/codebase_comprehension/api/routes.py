@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pathlib
+import time
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -27,6 +28,8 @@ from codebase_comprehension.models import (
 )
 
 router = APIRouter()
+
+_SERVICE_STARTED_AT = time.monotonic()
 
 
 def _resolve_safe_directory(directory: str) -> pathlib.Path:
@@ -101,6 +104,7 @@ class HealthResponse(BaseModel):
 
     service: str = "codebase-comprehension"
     status: HealthStatus
+    uptime_seconds: float = 0.0
 
 
 # -- Endpoints ---------------------------------------------------------------
@@ -228,4 +232,7 @@ async def search_symbols(
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Service health check endpoint."""
-    return HealthResponse(status=HealthStatus.HEALTHY)
+    return HealthResponse(
+        status=HealthStatus.HEALTHY,
+        uptime_seconds=round(time.monotonic() - _SERVICE_STARTED_AT, 1),
+    )

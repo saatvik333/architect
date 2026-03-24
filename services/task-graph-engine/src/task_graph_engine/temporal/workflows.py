@@ -59,7 +59,7 @@ class TaskOrchestrationWorkflow:
         completed: set[str] = set()
         failed: set[str] = set()
         task_results: dict[str, dict[str, Any]] = {}
-        budget_status: dict[str, Any] = {}
+        budget_status: dict[str, Any] = {"checked": False}
 
         # Main orchestration loop.
         max_iterations = len(task_ids) * 4  # Safety bound to prevent infinite loops.

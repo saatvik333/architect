@@ -9,6 +9,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from architect_common.logging import setup_logging
+from architect_observability import init_observability, shutdown_observability
 from execution_sandbox.api.dependencies import get_config
 from execution_sandbox.api.routes import router
 
@@ -19,6 +20,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     config = get_config()
     setup_logging(log_level=config.architect.log_level)
     yield
+    shutdown_observability(_app)
 
 
 def create_app() -> FastAPI:
@@ -30,6 +32,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(router)
+    init_observability(app, "execution-sandbox")
     return app
 
 

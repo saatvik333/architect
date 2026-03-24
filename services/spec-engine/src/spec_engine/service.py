@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from architect_common.logging import setup_logging
+from architect_observability import init_observability, shutdown_observability
 from spec_engine.api.dependencies import cleanup, get_config
 from spec_engine.api.routes import router
 
@@ -18,6 +19,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     config = get_config()
     setup_logging(log_level=config.log_level)
     yield
+    shutdown_observability(app)
     await cleanup()
 
 
@@ -30,6 +32,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(router)
+    init_observability(app, "spec-engine")
     return app
 
 
