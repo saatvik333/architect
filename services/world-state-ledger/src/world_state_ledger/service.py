@@ -68,6 +68,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
     # ── Shutdown ─────────────────────────────────────────────────────
+    from architect_observability import shutdown_observability
+
+    shutdown_observability(app)
+
     if temporal_task is not None:
         temporal_task.cancel()
         with suppress(asyncio.CancelledError):
@@ -94,6 +98,10 @@ def create_app(config: WorldStateLedgerConfig | None = None) -> FastAPI:
     )
     app.state.config = config
     app.include_router(router)
+
+    from architect_observability import init_observability
+
+    init_observability(app, "world-state-ledger")
 
     return app
 

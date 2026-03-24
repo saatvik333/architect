@@ -1,0 +1,45 @@
+# Production overlay — use with: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+services:
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+
+  temporal:
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 2G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+
+  nats:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase C Observability & Operations
+
+- **architect-observability library** — new shared lib with OpenTelemetry tracing (OTLP exporter) and Prometheus metrics (FastAPI instrumentator with /metrics endpoint)
+- **Jaeger** added to docker-compose (port 16686 UI, 4317 OTLP) for distributed tracing
+- **Prometheus** added to docker-compose (port 9090) with scrape configs for all 10 services
+- **Grafana** added to docker-compose (port 3001) for metrics visualization
+- **Deployment pipeline** — GitHub Actions CD workflow with staging/production environments, manual approval gate for production
+- **Production overlay** — `docker-compose.prod.yml` with increased resource limits and restart policies
+- **Incident response runbook** — severity levels, health checks, common scenarios, rollback procedure
+- **Deployment runbook** — local dev, staging, production deploy procedures, horizontal scaling guidance
+- World-state-ledger and API gateway instrumented with OTel tracing + Prometheus metrics
+
 ### Added — Phase B Data Integrity & Performance
 - **Delta-based ledger storage** (P-C1) — mutations stored as diffs instead of full snapshots, with periodic checkpoints every 20 versions; state reconstruction via replay from nearest checkpoint
 - **Sandbox session persistence** (P-C3) — DockerExecutor now persists sessions to DB via SandboxSessionRepository; crash recovery loads active sessions on startup

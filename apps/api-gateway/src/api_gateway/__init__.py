@@ -31,6 +31,7 @@ from api_gateway.models import (
 )
 from api_gateway.service_client import ServiceClient
 from architect_common.logging import get_logger
+from architect_observability import init_observability
 
 logger = get_logger(component="api_gateway")
 
@@ -246,6 +247,10 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
 )
+
+# ── Observability ─────────────────────────────────────────────────
+
+init_observability(app, "api-gateway")
 
 
 # ── Exception handlers ──────────────────────────────────────────────

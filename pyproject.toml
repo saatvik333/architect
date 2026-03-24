@@ -44,6 +44,7 @@ known-first-party = [
     "architect_db",
     "architect_events",
     "architect_llm",
+    "architect_observability",
     "architect_sandbox_client",
     "architect_testing",
     "world_state_ledger",

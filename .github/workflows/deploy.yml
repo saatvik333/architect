@@ -1,0 +1,85 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      ref:
+        description: "Git ref to deploy (branch, tag, or SHA)"
+        required: false
+        default: "main"
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv sync --all-packages --group dev --locked
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Type check
+        run: uv run mypy libs/ services/ apps/
+
+      - name: Unit tests
+        run: uv run pytest libs/ services/ apps/ -x -q --tb=short --cov-fail-under=60
+        env:
+          ARCHITECT_PG_PASSWORD: ci_test_password
+
+  deploy-staging:
+    if: inputs.environment == 'staging'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying $(git rev-parse --short HEAD) to staging"
+          echo "TODO: Add actual deployment commands (docker compose, k8s apply, etc.)"
+
+      - name: Smoke tests
+        run: |
+          echo "TODO: Run smoke tests against staging environment"
+
+  deploy-production:
+    if: inputs.environment == 'production'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      # GitHub environment protection: requires manual approval
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying $(git rev-parse --short HEAD) to production"
+          echo "TODO: Add actual deployment commands"
+
+      - name: Post-deploy verification
+        run: |
+          echo "TODO: Run health checks against production"
