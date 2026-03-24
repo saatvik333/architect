@@ -304,7 +304,7 @@ class TestCommitCode:
             {"path": "tests/test_main.py", "content": "def test(): pass", "is_test": True},
         ]
 
-        result = await activities.commit_code(files, "feat: add feature", "/tmp/repo")
+        result = await activities.commit_code(files, "feat: add feature", "/workspace/repo")  # nosec B108
 
         assert result["commit_hash"] == "a" * 40
         assert result["files_written"] == 2

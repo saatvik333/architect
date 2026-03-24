@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
+
+# Ensure required env vars are set for tests that import ArchitectConfig.
+os.environ.setdefault("ARCHITECT_PG_PASSWORD", "test_password")
 
 from codebase_comprehension.ast_indexer import ASTIndexer
 from codebase_comprehension.index_store import IndexStore
