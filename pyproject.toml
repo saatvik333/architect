@@ -58,6 +58,9 @@ known-first-party = [
     "multi_model_router",
     "codebase_comprehension",
     "agent_comm_bus",
+    "knowledge_memory",
+    "economic_governor",
+    "human_interface",
 ]
 
 [tool.ruff.format]

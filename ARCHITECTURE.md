@@ -24,7 +24,7 @@ Token budgets are not guardrails -- they are forcing functions. When an agent ha
 
 ### 5. Humans stay in the loop until they choose to leave
 
-ARCHITECT is designed for increasing autonomy, not full autonomy from day one. Every phase adds capability. The Human Interface (Phase 5) provides dashboards, escalation paths, and approval gates. Humans opt out gradually as trust builds.
+ARCHITECT is designed for increasing autonomy, not full autonomy from day one. Every phase adds capability. The Human Interface (Phase 3) provides dashboards, escalation paths, and approval gates. Humans opt out gradually as trust builds.
 
 ---
 
@@ -34,7 +34,7 @@ ARCHITECT is designed for increasing autonomy, not full autonomy from day one. E
 flowchart TD
     USER --> CLI["CLI / API GW (apps/)"]
     CLI --> SpecEngine["Spec Engine [P2]"]
-    CLI --> HumanInterface["Human Interface [P5]"]
+    CLI --> HumanInterface["Human Interface [P3]"]
     SpecEngine --> TGE
 
     TGE["Task Graph Engine (DAG + scheduler)"]
@@ -242,19 +242,27 @@ flowchart TD
 
 ---
 
-### 10. Knowledge Memory (Phase 3) -- STUB
+### 10. Knowledge Memory (Phase 3) — Port 8014
 
-**Purpose:** Will implement a 5-layer memory hierarchy: working memory (current task), episodic memory (past runs), semantic memory (patterns), procedural memory (learned techniques), and meta-cognitive memory (self-assessment).
+**Purpose:** 5-layer memory hierarchy (L0 Working through L4 Meta-Strategy) with knowledge acquisition and compression pipelines. Agents learn from past work via pattern extraction and heuristic synthesis.
 
----
+**Key features:** Semantic search via pgvector embeddings, LLM-powered pattern extraction, observation-to-heuristic compression pipeline, knowledge acquisition from external documentation.
 
-### 11. Economic Governor (Phase 3) -- STUB
-
-**Purpose:** Will enforce token budgets dynamically, adjust model tier allocation based on burn rate, pause low-priority work when budget runs low, and produce cost reports.
+**Integration:** Subscribes to task lifecycle events via Redis Streams, publishes KNOWLEDGE_UPDATE via NATS, calls Codebase Comprehension for code context.
 
 ---
 
-### 12. Security Immune (Phase 3) -- STUB
+### 11. Economic Governor (Phase 3) — Port 8015
+
+**Purpose:** Real-time budget tracking with progressive enforcement (80% alert, 95% restrict, 100% halt), per-agent efficiency scoring, and spin detection.
+
+**Key features:** In-memory budget tracker with sliding-window burn rate, automatic tier downgrade enforcement, agent efficiency leaderboard, spin detection (3 retries with no diff = kill).
+
+**Integration:** Polls Multi-Model Router for cost data, proposes budget mutations to World State Ledger, publishes enforcement events to Redis Streams.
+
+---
+
+### 12. Security Immune (Phase 4) -- STUB
 
 **Purpose:** Will scan generated code for security vulnerabilities, dependency risks, and policy violations before any code is committed or deployed.
 
@@ -272,9 +280,13 @@ flowchart TD
 
 ---
 
-### 15. Human Interface (Phase 5) -- STUB
+### 15. Human Interface (Phase 3) — Port 8016
 
-**Purpose:** Will provide a web dashboard for monitoring system state, reviewing agent output, approving deployments, and configuring escalation policies.
+**Purpose:** Escalation management, approval gates, and dashboard UI extensions for human-in-the-loop workflows. Implements the should_escalate() protocol based on confidence, security criticality, cost impact, and architectural decisions.
+
+**Key features:** WebSocket push for real-time escalation notifications, DECISION NEEDED format with options/tradeoffs/recommendations, configurable approval gates, 4 new dashboard pages (Escalations, Progress, Budget, Activity).
+
+**Integration:** Subscribes to NATS ESCALATION messages and Redis Streams events, reads WSL for progress aggregation, reads Economic Governor for budget data with graceful fallback.
 
 ---
 

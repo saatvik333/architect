@@ -15,6 +15,15 @@ ProposalId = NewType("ProposalId", str)
 EventId = NewType("EventId", str)
 LedgerVersion = NewType("LedgerVersion", int)
 
+# ── Phase 3: Knowledge & Memory ──────────────────────────────────
+KnowledgeId = NewType("KnowledgeId", str)
+PatternId = NewType("PatternId", str)
+HeuristicId = NewType("HeuristicId", str)
+
+# ── Phase 3: Human Interface ─────────────────────────────────────
+EscalationId = NewType("EscalationId", str)
+ApprovalGateId = NewType("ApprovalGateId", str)
+
 
 def _prefixed_uuid(prefix: str) -> str:
     return f"{prefix}-{uuid.uuid4().hex}"
@@ -34,6 +43,26 @@ def new_proposal_id() -> ProposalId:
 
 def new_event_id() -> EventId:
     return EventId(_prefixed_uuid("evt"))
+
+
+def new_knowledge_id() -> KnowledgeId:
+    return KnowledgeId(_prefixed_uuid("know"))
+
+
+def new_pattern_id() -> PatternId:
+    return PatternId(_prefixed_uuid("pat"))
+
+
+def new_heuristic_id() -> HeuristicId:
+    return HeuristicId(_prefixed_uuid("heur"))
+
+
+def new_escalation_id() -> EscalationId:
+    return EscalationId(_prefixed_uuid("esc"))
+
+
+def new_approval_gate_id() -> ApprovalGateId:
+    return ApprovalGateId(_prefixed_uuid("gate"))
 
 
 # ── Common field annotations ─────────────────────────────────────

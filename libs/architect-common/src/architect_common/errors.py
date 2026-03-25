@@ -151,3 +151,33 @@ class RoutingError(ArchitectError):
 
 class NoAvailableTierError(RoutingError):
     """All tiers exhausted; needs human escalation."""
+
+
+# ── Knowledge & Memory ──────────────────────────────────────────
+class KnowledgeMemoryError(ArchitectError):
+    """Errors related to the Knowledge & Memory system."""
+
+
+class KnowledgeNotFoundError(KnowledgeMemoryError):
+    """Referenced knowledge entry does not exist."""
+
+
+class PatternExtractionError(KnowledgeMemoryError):
+    """Failed to extract a pattern from observations."""
+
+
+class CompressionError(KnowledgeMemoryError):
+    """Memory compression pipeline failed."""
+
+
+# ── Human Interface ─────────────────────────────────────────────
+class EscalationError(ArchitectError):
+    """Errors related to the Human Interface escalation system."""
+
+
+class EscalationNotFoundError(EscalationError):
+    """Referenced escalation does not exist."""
+
+
+class ApprovalGateError(EscalationError):
+    """Errors related to approval gates."""

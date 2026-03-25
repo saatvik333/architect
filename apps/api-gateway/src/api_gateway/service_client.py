@@ -21,6 +21,9 @@ _SERVICE_URL_MAP = {
     "router": "multi_model_router_url",
     "codebase": "codebase_comprehension_url",
     "comm-bus": "agent_comm_bus_url",
+    "knowledge-memory": "knowledge_memory_url",
+    "economic-governor": "economic_governor_url",
+    "human-interface": "human_interface_url",
 }
 
 # Per-service read timeouts (seconds) for long-running operations.
@@ -167,3 +170,59 @@ class ServiceClient:
 
     async def publish_message(self, data: dict[str, Any]) -> dict[str, Any]:
         return await self._request("comm-bus", "POST", "/api/v1/bus/publish", json=data)
+
+    # ── Phase 3 service methods ───────────────────────────────────
+
+    # Knowledge & Memory
+    async def query_knowledge(self, data: dict[str, Any]) -> dict[str, Any]:
+        return await self._request("knowledge-memory", "POST", "/api/v1/knowledge/query", json=data)
+
+    async def get_knowledge_stats(self) -> dict[str, Any]:
+        return await self._request("knowledge-memory", "GET", "/api/v1/stats")
+
+    # Economic Governor
+    async def get_budget_status(self) -> dict[str, Any]:
+        return await self._request("economic-governor", "GET", "/api/v1/budget/status")
+
+    async def get_efficiency_leaderboard(self) -> dict[str, Any]:
+        return await self._request("economic-governor", "GET", "/api/v1/efficiency/leaderboard")
+
+    # Human Interface
+    async def list_escalations(self, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        return await self._request(  # type: ignore[return-value]
+            "human-interface", "GET", "/api/v1/escalations", params=params
+        )
+
+    async def get_escalation(self, escalation_id: str) -> dict[str, Any]:
+        return await self._request("human-interface", "GET", f"/api/v1/escalations/{escalation_id}")
+
+    async def create_escalation(self, data: dict[str, Any]) -> dict[str, Any]:
+        return await self._request("human-interface", "POST", "/api/v1/escalations", json=data)
+
+    async def resolve_escalation(self, escalation_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        return await self._request(
+            "human-interface", "POST", f"/api/v1/escalations/{escalation_id}/resolve", json=data
+        )
+
+    async def get_escalation_stats(self) -> dict[str, Any]:
+        return await self._request("human-interface", "GET", "/api/v1/escalations/stats")
+
+    async def list_approval_gates(
+        self, params: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
+        return await self._request(  # type: ignore[return-value]
+            "human-interface", "GET", "/api/v1/approval-gates", params=params
+        )
+
+    async def vote_on_gate(self, gate_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        return await self._request(
+            "human-interface", "POST", f"/api/v1/approval-gates/{gate_id}/vote", json=data
+        )
+
+    async def get_progress(self) -> dict[str, Any]:
+        return await self._request("human-interface", "GET", "/api/v1/progress")
+
+    async def get_activity(self, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        return await self._request(  # type: ignore[return-value]
+            "human-interface", "GET", "/api/v1/activity", params=params
+        )

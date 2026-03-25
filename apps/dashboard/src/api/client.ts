@@ -1,4 +1,14 @@
-import type { TaskStatus, TaskLogs, HealthStatus, Proposal } from './types';
+import type {
+  TaskStatus,
+  TaskLogs,
+  HealthStatus,
+  Proposal,
+  Escalation,
+  EscalationStats,
+  ApprovalGate,
+  ProgressSummary,
+  ActivityEvent,
+} from './types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -41,4 +51,72 @@ export async function cancelTask(taskId: string, force: boolean = false): Promis
     method: 'POST',
     body: JSON.stringify({ force }),
   });
+}
+
+// ─── Escalations ────────────────────────────────────────────────
+
+export async function fetchEscalations(
+  params?: { status?: string; category?: string; severity?: string; limit?: number },
+  signal?: AbortSignal,
+): Promise<Escalation[]> {
+  const searchParams = new URLSearchParams();
+  if (params?.status) searchParams.set('status', params.status);
+  if (params?.category) searchParams.set('category', params.category);
+  if (params?.severity) searchParams.set('severity', params.severity);
+  if (params?.limit) searchParams.set('limit', String(params.limit));
+  const qs = searchParams.toString();
+  return request<Escalation[]>(`/api/v1/escalations${qs ? `?${qs}` : ''}`, { signal });
+}
+
+export async function fetchEscalation(id: string, signal?: AbortSignal): Promise<Escalation> {
+  return request<Escalation>(`/api/v1/escalations/${id}`, { signal });
+}
+
+export async function resolveEscalation(
+  id: string,
+  data: { resolved_by: string; resolution: string; custom_input?: string },
+): Promise<Escalation> {
+  return request<Escalation>(`/api/v1/escalations/${id}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchEscalationStats(signal?: AbortSignal): Promise<EscalationStats> {
+  return request<EscalationStats>('/api/v1/escalations/stats', { signal });
+}
+
+// ─── Approval Gates ─────────────────────────────────────────────
+
+export async function fetchApprovalGates(
+  params?: { status?: string },
+  signal?: AbortSignal,
+): Promise<ApprovalGate[]> {
+  const searchParams = new URLSearchParams();
+  if (params?.status) searchParams.set('status', params.status);
+  const qs = searchParams.toString();
+  return request<ApprovalGate[]>(`/api/v1/approval-gates${qs ? `?${qs}` : ''}`, { signal });
+}
+
+export async function voteOnGate(
+  gateId: string,
+  data: { voter: string; decision: 'approve' | 'deny'; comment?: string },
+): Promise<ApprovalGate> {
+  return request<ApprovalGate>(`/api/v1/approval-gates/${gateId}/vote`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+// ─── Progress ───────────────────────────────────────────────────
+
+export async function fetchProgress(signal?: AbortSignal): Promise<ProgressSummary> {
+  return request<ProgressSummary>('/api/v1/progress', { signal });
+}
+
+// ─── Activity ───────────────────────────────────────────────────
+
+export async function fetchActivity(limit?: number, signal?: AbortSignal): Promise<ActivityEvent[]> {
+  const qs = limit ? `?limit=${limit}` : '';
+  return request<ActivityEvent[]>(`/api/v1/activity${qs}`, { signal });
 }

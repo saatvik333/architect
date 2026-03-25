@@ -5,16 +5,45 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-const navItems = [
-  { to: '/tasks',     label: 'Tasks',     icon: '▶' },
-  { to: '/health',    label: 'Health',    icon: '◈' },
-  { to: '/proposals', label: 'Proposals', icon: '◆' },
+interface NavItem {
+  to: string;
+  label: string;
+  icon: string;
+}
+
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
+  {
+    title: 'Monitor',
+    items: [
+      { to: '/tasks',     label: 'Tasks',     icon: '\u25B6' },
+      { to: '/health',    label: 'Health',    icon: '\u25C8' },
+      { to: '/proposals', label: 'Proposals', icon: '\u25C6' },
+    ],
+  },
+  {
+    title: 'Human Interface',
+    items: [
+      { to: '/escalations', label: 'Escalations', icon: '\u26A0' },
+      { to: '/progress',    label: 'Progress',    icon: '\u25CE' },
+      { to: '/budget',      label: 'Budget',      icon: '\u25A3' },
+      { to: '/activity',    label: 'Activity',    icon: '\u25CF' },
+    ],
+  },
 ];
 
 const routeLabels: Record<string, string> = {
-  '/tasks':     'Tasks',
-  '/health':    'Health',
-  '/proposals': 'Proposals',
+  '/tasks':       'Tasks',
+  '/health':      'Health',
+  '/proposals':   'Proposals',
+  '/escalations': 'Escalations',
+  '/progress':    'Progress',
+  '/budget':      'Budget',
+  '/activity':    'Activity',
 };
 
 function Layout({ children }: LayoutProps) {
@@ -33,24 +62,28 @@ function Layout({ children }: LayoutProps) {
           </p>
         </div>
 
-        {/* Section label */}
-        <div className="px-5 pt-4 pb-2">
-          <span className="text-gray-500" style={{ fontSize: '9px', letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600 }}>
-            Monitor
-          </span>
-        </div>
-
         {/* Navigation */}
-        <nav className="flex-1 px-3 space-y-0.5">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-            >
-              <span style={{ fontSize: '10px', opacity: 0.75 }}>{item.icon}</span>
-              {item.label}
-            </NavLink>
+        <nav className="flex-1 px-3 overflow-y-auto">
+          {navSections.map((section) => (
+            <div key={section.title}>
+              <div className="px-2 pt-4 pb-2">
+                <span className="text-gray-500" style={{ fontSize: '9px', letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 600 }}>
+                  {section.title}
+                </span>
+              </div>
+              <div className="space-y-0.5">
+                {section.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                  >
+                    <span style={{ fontSize: '10px', opacity: 0.75 }}>{item.icon}</span>
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
 

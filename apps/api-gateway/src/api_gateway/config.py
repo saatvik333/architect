@@ -26,6 +26,11 @@ class GatewayConfig(BaseSettings):
     codebase_comprehension_url: str = "http://localhost:8012"
     agent_comm_bus_url: str = "http://localhost:8013"
 
+    # Backend service URLs — Phase 3
+    knowledge_memory_url: str = "http://localhost:8014"
+    economic_governor_url: str = "http://localhost:8015"
+    human_interface_url: str = "http://localhost:8016"
+
     # CORS
     cors_origins: list[str] = ["http://localhost:3000"]
 

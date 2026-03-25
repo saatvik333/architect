@@ -64,7 +64,7 @@ A multi-agent system that replaces the software engineering loop: specify → bu
 - `make dev` — full local environment (infra-up + migrate)
 - `make migrate` — run Alembic database migrations
 - `make clean` — remove `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `*.egg-info`
-- `make run-services` — start all backend services (Phase 1 + Phase 2)
+- `make run-services` — start all backend services (Phase 1 + Phase 2 + Phase 3)
 - `make run-gateway` — start the API gateway on port 8000
 - `make run-dashboard` — start the dashboard dev server on port 3000
 - `make run-all` — start everything (infra + services + gateway + dashboard)
@@ -94,11 +94,15 @@ After completing any non-trivial change, automatically:
 4. Agent Communication Bus (Component 6) — port 8013
 5. Dashboard (React/TypeScript SPA) — `apps/dashboard/`, dev port 3000
 
-## Phase 3–5 Components (stubs only)
+## Phase 3 Components (active)
 
-- Knowledge & Memory (Component 9)
-- Economic Governor (Component 10)
+1. Knowledge & Memory (Component 9) — port 8014
+2. Economic Governor (Component 10) — port 8015
+3. Human Interface (Component 14) — port 8016
+4. Dashboard extensions — Escalations, Progress, Budget, Activity pages
+
+## Phase 4–5 Components (stubs only)
+
 - Security Immune System (Component 11)
 - Deployment Pipeline (Component 12)
 - Failure Taxonomy (Component 13)
-- Human Interface (Component 14)
