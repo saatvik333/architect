@@ -8,10 +8,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: architect
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U architect"]
       interval: 5s
@@ -29,9 +30,10 @@ services:
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping"]
       interval: 5s
@@ -51,12 +53,13 @@ services:
       - POSTGRES_USER=architect
       - POSTGRES_PWD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       - POSTGRES_SEEDS=postgres
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - SKIP_DYNAMIC_CONFIG_UPDATE=true
     ports:
-      - "7233:7233"
+      - "127.0.0.1:7233:7233"
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -68,9 +71,10 @@ services:
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       - temporal
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -79,15 +83,17 @@ services:
 
   nats:
     image: nats:2.10.24
-    command: ["-js", "-m", "8222"]
+    command: ["--js", "--sd", "/data", "--auth", "${NATS_TOKEN:?Set NATS_TOKEN in .env}"]
     ports:
-      - "4222:4222"
-      - "8222:8222"
+      - "127.0.0.1:4222:4222"
+    volumes:
+      - nats_data:/data
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8222/healthz"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -95,7 +101,8 @@ services:
           memory: 256M
 
   docker-socket-proxy:
-    image: tecnativa/docker-socket-proxy:0.6
+    # Pinned to latest stable; was 0.3.0, upgraded to match upstream
+    image: tecnativa/docker-socket-proxy:0.6.0
     environment:
       CONTAINERS: 1
       EXEC: 1
@@ -108,6 +115,8 @@ services:
       SWARM: 0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - sandbox-internal
     deploy:
       resources:
         limits:
@@ -115,13 +124,14 @@ services:
           memory: 64M
 
   jaeger:
-    image: jaegertracing/all-in-one:1.62
+    image: jaegertracing/all-in-one:1.64.0
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:
-      - "6831:6831/udp"
-      - "16686:16686"
-      - "4317:4317"
+      - "127.0.0.1:6831:6831/udp"
+      - "127.0.0.1:16686:16686"
+      - "127.0.0.1:4317:4317"
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -132,9 +142,13 @@ services:
     image: prom/prometheus:v2.54.1
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus_data:/prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -144,22 +158,32 @@ services:
   grafana:
     image: grafana/grafana:11.3.0
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?Set GRAFANA_PASSWORD in .env}
       GF_SERVER_HTTP_PORT: "3001"
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
+    restart: unless-stopped
     deploy:
       resources:
         limits:
           cpus: '0.25'
           memory: 256M
 
+networks:
+  default:
+    driver: bridge
+  sandbox-internal:
+    driver: bridge
+    internal: true
+
 volumes:
   postgres_data:
   redis_data:
+  nats_data:
   prometheus_data:
   grafana_data:
