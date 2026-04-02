@@ -20,6 +20,9 @@ Each service binds to a dedicated port on `localhost` during local development:
 | Multi-Model Router       | 8011 |
 | Codebase Comprehension   | 8012 |
 | Agent Comm Bus           | 8013 |
+| Knowledge & Memory       | 8014 |
+| Economic Governor        | 8015 |
+| Human Interface          | 8016 |
 
 ### API Gateway
 
@@ -1199,3 +1202,677 @@ Search for code using semantic similarity via pgvector embeddings.
   "stream_name": "ARCHITECT"
 }
 ```
+
+---
+
+## 10. Knowledge & Memory (Port 8014)
+
+The Knowledge & Memory service manages long-term knowledge storage, working memory for active tasks, heuristic rules evolved from past observations, and a compression pipeline that distills raw data into reusable patterns and strategies.
+
+### `POST /api/v1/knowledge/query` -- Search Knowledge
+
+Search knowledge entries by semantic similarity and metadata filters.
+
+**Request body:**
+
+```json
+{
+  "layer": "domain",
+  "topic": "authentication",
+  "content_type": "documentation",
+  "limit": 20
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| layer | string | no | Filter by knowledge layer |
+| topic | string | no | Filter by topic |
+| content_type | string | no | Filter by content type (e.g., `documentation`, `pattern`) |
+| limit | int | no | Maximum results to return |
+
+**Response (200):**
+
+```json
+{
+  "entries": [
+    {
+      "id": "know-abc123",
+      "layer": "domain",
+      "topic": "authentication",
+      "title": "JWT Token Refresh Patterns",
+      "content": "...",
+      "content_type": "documentation",
+      "confidence": 0.92,
+      "tags": ["jwt", "auth"],
+      "source": "doc_fetcher",
+      "usage_count": 5,
+      "active": true
+    }
+  ],
+  "total": 1
+}
+```
+
+### `GET /api/v1/knowledge/{knowledge_id}` -- Get Knowledge Entry
+
+Retrieve a specific knowledge entry by ID. Increments the usage counter on each access.
+
+**Path parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| knowledge_id | string | yes | Knowledge entry ID |
+
+**Response (200):** Full knowledge entry object.
+
+**Errors:**
+
+| Status | Condition |
+|--------|-----------|
+| 404 | Knowledge entry not found |
+
+### `POST /api/v1/knowledge` -- Create Knowledge Entry
+
+Store a new knowledge entry.
+
+**Request body:** A `KnowledgeEntry` object with fields: `id`, `layer`, `topic`, `title`, `content`, `content_type`, `confidence`, `tags`, `embedding`, `version_tag`, `source`.
+
+**Response (201):**
+
+```json
+{
+  "id": "know-abc123",
+  "status": "created"
+}
+```
+
+### `PUT /api/v1/knowledge/{knowledge_id}/feedback` -- Provide Feedback
+
+Provide feedback on a knowledge entry. Positive feedback increments usage; negative feedback deactivates the entry.
+
+**Request body:**
+
+```json
+{
+  "useful": true
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "id": "know-abc123",
+  "status": "feedback_recorded"
+}
+```
+
+**Errors:**
+
+| Status | Condition |
+|--------|-----------|
+| 404 | Knowledge entry not found |
+
+### `GET /api/v1/heuristics` -- List Heuristics
+
+List all active heuristic rules with optional domain filter.
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| domain | string | (none) | Filter heuristics by domain |
+
+**Response (200):** Array of heuristic rule objects.
+
+### `GET /api/v1/heuristics/match` -- Match Heuristics
+
+Find heuristics matching the given task type and domain criteria.
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| task_type | string | (none) | Filter by task type |
+| domain | string | (none) | Filter by domain |
+
+**Response (200):** Array of matching heuristic rule objects.
+
+### `POST /api/v1/heuristics/{heuristic_id}/outcome` -- Record Outcome
+
+Record a success or failure outcome for a heuristic, triggering confidence evolution.
+
+**Path parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| heuristic_id | string | yes | Heuristic rule ID |
+
+**Request body:**
+
+```json
+{
+  "success": true
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "id": "heur-abc123",
+  "status": "outcome_recorded"
+}
+```
+
+### `POST /api/v1/acquire` -- Trigger Knowledge Acquisition
+
+Trigger an asynchronous knowledge acquisition workflow. In production, this starts a Temporal workflow.
+
+**Request body:**
+
+```json
+{
+  "topic": "oauth2",
+  "source_urls": ["https://example.com/docs/oauth2"]
+}
+```
+
+**Response (202):**
+
+```json
+{
+  "status": "accepted",
+  "topic": "oauth2",
+  "message": "Knowledge acquisition workflow queued."
+}
+```
+
+### `POST /api/v1/compress` -- Trigger Compression
+
+Trigger the compression pipeline to distill observations into patterns, heuristics, and meta-strategies.
+
+**Request body:**
+
+```json
+{
+  "scope": "all"
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "patterns_created": 0,
+  "heuristics_created": 0,
+  "strategies_proposed": 0,
+  "observations_processed": 0
+}
+```
+
+### `GET /api/v1/working-memory/{task_id}/{agent_id}` -- Get Working Memory
+
+Retrieve working memory for a specific task-agent pair.
+
+**Path parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| task_id | string | yes | Task ID |
+| agent_id | string | yes | Agent ID |
+
+**Response (200):** Working memory object with `scratchpad`, `context_entries`, and metadata.
+
+**Errors:**
+
+| Status | Condition |
+|--------|-----------|
+| 404 | Working memory not found for this task-agent pair |
+
+### `POST /api/v1/working-memory/{task_id}/{agent_id}` -- Update Working Memory
+
+Create or update working memory for a task-agent pair.
+
+**Path parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| task_id | string | yes | Task ID |
+| agent_id | string | yes | Agent ID |
+
+**Request body:**
+
+```json
+{
+  "scratchpad_updates": { "current_step": "testing" },
+  "add_context_entries": ["know-abc123"]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| scratchpad_updates | object | no | Key-value pairs to merge into the scratchpad |
+| add_context_entries | array of string | no | Knowledge entry IDs to add to context |
+
+**Response (200):** Updated working memory object.
+
+### `GET /api/v1/stats` -- Knowledge Store Statistics
+
+Return aggregate statistics about the knowledge store.
+
+**Response (200):**
+
+```json
+{
+  "total_entries": 150,
+  "entries_by_layer": { "domain": 80, "meta": 40, "operational": 30 },
+  "total_observations": 500,
+  "total_heuristics": 25,
+  "total_meta_strategies": 3
+}
+```
+
+### `GET /api/v1/meta-strategies` -- List Meta-Strategies
+
+List all meta-strategies derived from the compression pipeline.
+
+**Response (200):** Array of meta-strategy objects.
+
+---
+
+## 11. Economic Governor (Port 8015)
+
+The Economic Governor tracks token and cost budgets, computes agent efficiency scores, and enforces spending limits via a tiered alert/restrict/halt model.
+
+### `GET /api/v1/budget/status` -- Budget Snapshot
+
+Return the current budget snapshot including total budget, consumed amounts, and enforcement level.
+
+**Response (200):**
+
+```json
+{
+  "total_budget_usd": 500.0,
+  "consumed_usd": 125.50,
+  "consumed_tokens": 2500000,
+  "consumed_pct": 25.1,
+  "enforcement_level": "normal",
+  "phase_breakdown": [
+    {
+      "phase": "implementation",
+      "allocated_usd": 200.0,
+      "consumed_usd": 75.30
+    }
+  ]
+}
+```
+
+### `GET /api/v1/budget/phases` -- Per-Phase Budget Breakdown
+
+Return per-phase budget allocation and consumption.
+
+**Response (200):** Array of `PhaseStatus` objects from the budget snapshot's `phase_breakdown`.
+
+### `POST /api/v1/budget/allocate` -- Allocate Budget
+
+Compute a budget allocation for a project.
+
+**Request body:** A `BudgetAllocationRequest` object with project parameters.
+
+**Response (200):**
+
+```json
+{
+  "total_usd": 500.0,
+  "phases": [
+    { "phase": "implementation", "allocated_usd": 200.0 },
+    { "phase": "testing", "allocated_usd": 150.0 }
+  ]
+}
+```
+
+### `POST /api/v1/budget/record-consumption` -- Record Token Consumption
+
+Record token consumption for an agent and return the current enforcement level.
+
+**Request body:**
+
+```json
+{
+  "agent_id": "agent-abc123",
+  "tokens": 5000,
+  "cost_usd": 0.15
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| agent_id | string | yes | Agent that consumed tokens |
+| tokens | int | yes | Number of tokens consumed (>= 0) |
+| cost_usd | float | yes | Cost in USD (>= 0.0) |
+
+**Response (200):**
+
+```json
+{
+  "enforcement_level": "normal"
+}
+```
+
+**Enforcement levels:** `normal`, `alert`, `restrict`, `halt`
+
+### `GET /api/v1/efficiency/leaderboard` -- Agent Efficiency Leaderboard
+
+Return the agent efficiency leaderboard with scores for all tracked agents.
+
+**Response (200):**
+
+```json
+{
+  "entries": [
+    {
+      "agent_id": "agent-abc123",
+      "score": 0.85,
+      "tokens_used": 50000,
+      "tasks_completed": 10,
+      "cost_per_task": 1.50
+    }
+  ],
+  "computed_at": "2026-03-14T12:00:00Z"
+}
+```
+
+### `GET /api/v1/efficiency/agent/{agent_id}` -- Agent Efficiency Score
+
+Return the efficiency score for a specific agent.
+
+**Path parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| agent_id | string | yes | Agent ID |
+
+**Response (200):** A single `AgentEfficiencyScore` object.
+
+### `GET /api/v1/enforcement/history` -- Enforcement Action History
+
+Return the history of enforcement actions (level transitions, warnings, restrictions).
+
+**Response (200):** Array of `EnforcementRecord` objects.
+
+### `GET /api/v1/enforcement/current-level` -- Current Enforcement Level
+
+Return the current enforcement level and budget consumption percentage.
+
+**Response (200):**
+
+```json
+{
+  "level": "normal",
+  "consumed_pct": 25.1
+}
+```
+
+---
+
+## 12. Human Interface (Port 8016)
+
+The Human Interface service manages escalations (decisions requiring human input), approval gates (multi-party sign-off), progress aggregation, activity feeds, and real-time WebSocket push to the dashboard.
+
+### `POST /api/v1/escalations` -- Create Escalation
+
+Create a new escalation and broadcast to connected WebSocket clients.
+
+**Request body:**
+
+```json
+{
+  "source_agent_id": "agent-abc123",
+  "source_task_id": "task-xyz789",
+  "summary": "Ambiguous requirement: authentication method unclear",
+  "category": "ambiguity",
+  "severity": "high",
+  "options": [
+    { "label": "Use OAuth2", "description": "Implement OAuth2 with Google" },
+    { "label": "Use API keys", "description": "Implement API key auth" }
+  ],
+  "recommended_option": 0,
+  "reasoning": "OAuth2 is mentioned in related docs",
+  "risk_if_wrong": "Wrong auth implementation requires full rewrite",
+  "expires_in_minutes": 60
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| source_agent_id | string | yes | Agent raising the escalation |
+| source_task_id | string | yes | Related task |
+| summary | string | yes | Human-readable summary |
+| category | EscalationCategory | yes | Category enum value |
+| severity | EscalationSeverity | yes | Severity enum value |
+| options | array | no | Decision options |
+| recommended_option | int | no | Index of recommended option |
+| reasoning | string | no | Agent's reasoning |
+| risk_if_wrong | string | no | Risk assessment |
+| expires_in_minutes | int | no | Auto-expire timeout (default from config) |
+
+**Response (201):** Full `EscalationResponse` object.
+
+### `GET /api/v1/escalations` -- List Escalations
+
+List escalations with optional filters.
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| status | EscalationStatus | (none) | Filter by status: `pending`, `resolved`, `expired`, `auto_resolved` |
+| category | EscalationCategory | (none) | Filter by category |
+| severity | EscalationSeverity | (none) | Filter by severity |
+| limit | int | 50 | Maximum results (1-1000) |
+| offset | int | 0 | Pagination offset |
+
+**Response (200):** Array of `EscalationResponse` objects.
+
+### `GET /api/v1/escalations/stats` -- Escalation Statistics
+
+Return aggregated escalation statistics.
+
+**Response (200):**
+
+```json
+{
+  "total": 42,
+  "pending": 5,
+  "resolved": 30,
+  "expired": 7
+}
+```
+
+### `GET /api/v1/escalations/{escalation_id}` -- Get Escalation
+
+Get a single escalation by ID.
+
+**Path parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| escalation_id | string | yes | Escalation ID |
+
+**Response (200):** Full `EscalationResponse` object.
+
+**Errors:**
+
+| Status | Condition |
+|--------|-----------|
+| 404 | Escalation not found |
+
+### `POST /api/v1/escalations/{escalation_id}/resolve` -- Resolve Escalation
+
+Resolve an escalation with a human decision. Identity is taken from the `X-Authenticated-User` header or the `resolved_by` request field.
+
+**Path parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| escalation_id | string | yes | Escalation to resolve |
+
+**Request body:**
+
+```json
+{
+  "resolved_by": "operator@example.com",
+  "resolution": "Use OAuth2",
+  "custom_input": { "provider": "google" }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| resolved_by | string | no | Resolver identity (fallback if no header) |
+| resolution | string | yes | The chosen resolution |
+| custom_input | object | no | Additional resolution context |
+
+**Response (200):** Updated `EscalationResponse` object.
+
+**Errors:**
+
+| Status | Condition |
+|--------|-----------|
+| 401 | No identity provided (missing header and body field) |
+| 404 | Escalation not found |
+
+### `POST /api/v1/approval-gates` -- Create Approval Gate
+
+Create a new approval gate requiring multi-party sign-off.
+
+**Request body:**
+
+```json
+{
+  "action_type": "deploy",
+  "resource_id": "service-auth-v2",
+  "required_approvals": 2,
+  "context": { "environment": "production" },
+  "expires_in_minutes": 120
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| action_type | string | yes | Type of action requiring approval |
+| resource_id | string | yes | Resource being acted upon |
+| required_approvals | int | yes | Number of approvals needed |
+| context | object | no | Additional context |
+| expires_in_minutes | int | no | Auto-expire timeout |
+
+**Response (201):** Full `ApprovalGateResponse` object.
+
+### `GET /api/v1/approval-gates` -- List Approval Gates
+
+List approval gates with optional filters.
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| status | ApprovalGateStatus | (none) | Filter: `pending`, `approved`, `denied`, `expired` |
+| action_type | string | (none) | Filter by action type |
+| limit | int | 50 | Maximum results (1-1000) |
+| offset | int | 0 | Pagination offset |
+
+**Response (200):** Array of `ApprovalGateResponse` objects.
+
+### `GET /api/v1/approval-gates/{gate_id}` -- Get Approval Gate
+
+Get a single approval gate by ID.
+
+**Path parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| gate_id | string | yes | Approval gate ID |
+
+**Response (200):** Full `ApprovalGateResponse` object.
+
+**Errors:**
+
+| Status | Condition |
+|--------|-----------|
+| 404 | Approval gate not found |
+
+### `POST /api/v1/approval-gates/{gate_id}/vote` -- Cast Vote
+
+Cast a vote on an approval gate. Auto-resolves when enough votes are reached. A "deny" vote immediately denies the gate. Identity is taken from `X-Authenticated-User` header or `voter` request field.
+
+**Path parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| gate_id | string | yes | Approval gate ID |
+
+**Request body:**
+
+```json
+{
+  "voter": "operator@example.com",
+  "decision": "approve",
+  "comment": "Looks good to deploy"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| voter | string | no | Voter identity (fallback if no header) |
+| decision | string | yes | `approve` or `deny` |
+| comment | string | no | Optional comment |
+
+**Response (200):** Updated `ApprovalGateResponse` object.
+
+**Errors:**
+
+| Status | Condition |
+|--------|-----------|
+| 400 | Gate is no longer pending |
+| 401 | No identity provided |
+| 404 | Approval gate not found |
+| 409 | Voter has already voted on this gate |
+
+### `GET /api/v1/progress` -- Progress Summary
+
+Aggregate progress from task graph and budget services. Falls back to defaults if upstream services are unavailable.
+
+**Response (200):**
+
+```json
+{
+  "tasks_completed": 15,
+  "tasks_total": 42,
+  "completion_pct": 35.7,
+  "budget_consumed_pct": 25.1
+}
+```
+
+### `GET /api/v1/activity` -- Activity Feed
+
+Return recent activity events (stub -- returns empty list in current implementation).
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| limit | int | 20 | Maximum results (1-200) |
+
+**Response (200):** Array of `ActivityEvent` objects.
+
+### `WebSocket /api/v1/ws` -- Real-Time Push
+
+WebSocket endpoint for real-time event push to dashboard clients. See [WebSocket Protocol Specification](websocket-protocol.md) for full details.
+
+**Connection:** `ws://host:8016/api/v1/ws?token=<ARCHITECT_WS_TOKEN>`
+
+**Authentication:** Token-based via query parameter, validated against `ARCHITECT_WS_TOKEN` env var.
+
+**Broadcast message types:** `escalation_created`, `escalation_resolved`, `approval_gate_created`, `approval_vote_cast`
