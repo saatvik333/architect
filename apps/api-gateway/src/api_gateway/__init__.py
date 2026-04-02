@@ -190,8 +190,17 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
 
         api_keys = config.api_keys
 
-        # No keys configured = open access (development only)
+        # No keys configured — fail closed in non-dev environments
         if not api_keys:
+            if config.environment not in ("dev", "test", "development"):
+                logger.error("auth_no_keys", msg="Auth enabled but no API keys configured")
+                return JSONResponse(
+                    status_code=503,
+                    content={"detail": "Service misconfigured: auth enabled with no keys"},
+                )
+            logger.warning(
+                "auth_open_access", msg="No API keys configured — open access (dev only)"
+            )
             return await call_next(request)
 
         # Extract Bearer token
