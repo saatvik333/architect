@@ -1,13 +1,13 @@
 """Add FK and unique constraints to approval_votes.
 
-Revision ID: 006
-Revises: 005
+Revision ID: 006_add_vote_constraints
+Revises: 005_add_phase3_tables
 """
 
 from alembic import op
 
-revision = "006"
-down_revision = "005"
+revision = "006_add_vote_constraints"
+down_revision = "005_add_phase3_tables"
 
 
 def upgrade() -> None:

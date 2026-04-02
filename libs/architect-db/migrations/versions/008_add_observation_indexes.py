@@ -1,13 +1,13 @@
 """Add indexes on observations table for compression pipeline.
 
-Revision ID: 008
-Revises: 007
+Revision ID: 008_add_observation_indexes
+Revises: 007_add_pgvector_column
 """
 
 from alembic import op
 
-revision = "008"
-down_revision = "007"
+revision = "008_add_observation_indexes"
+down_revision = "007_add_pgvector_column"
 
 
 def upgrade() -> None:

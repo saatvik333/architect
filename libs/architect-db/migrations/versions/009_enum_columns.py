@@ -1,13 +1,13 @@
 """Migrate enum-like Text columns to VARCHAR(64) for sa.Enum(native_enum=False).
 
-Revision ID: 009
-Revises: 008
+Revision ID: 009_enum_columns
+Revises: 008_add_observation_indexes
 """
 
 from alembic import op
 
-revision = "009"
-down_revision = "008"
+revision = "009_enum_columns"
+down_revision = "008_add_observation_indexes"
 
 
 def upgrade() -> None:

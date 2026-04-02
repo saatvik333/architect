@@ -1,13 +1,13 @@
 """Add pgvector embedding column to knowledge_entries.
 
-Revision ID: 007
-Revises: 006
+Revision ID: 007_add_pgvector_column
+Revises: 006_add_vote_constraints
 """
 
 from alembic import op
 
-revision = "007"
-down_revision = "006"
+revision = "007_add_pgvector_column"
+down_revision = "006_add_vote_constraints"
 
 
 def upgrade() -> None:
