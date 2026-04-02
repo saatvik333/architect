@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from architect_common.enums import HealthStatus
+from architect_common.health import HealthResponse
 from architect_common.logging import get_logger
 from architect_common.types import AgentId, HeuristicId, KnowledgeId, TaskId
 from knowledge_memory.heuristic_engine import HeuristicEngine
@@ -33,14 +34,6 @@ router = APIRouter()
 
 
 # ── Request / Response schemas ─────────────────────────────────────
-
-
-class HealthResponse(BaseModel):
-    """Response body for GET /health."""
-
-    service: str = "knowledge-memory"
-    status: HealthStatus
-    uptime_seconds: float = 0.0
 
 
 class WorkingMemoryUpdate(BaseModel):
@@ -331,6 +324,7 @@ async def health_check(request: Request) -> HealthResponse:
 
     uptime = time.monotonic() - getattr(request.app.state, "started_at", time.monotonic())
     return HealthResponse(
+        service="knowledge-memory",
         status=status,
         uptime_seconds=round(uptime, 2),
     )

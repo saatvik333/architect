@@ -17,7 +17,6 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from architect_common.enums import (
@@ -27,6 +26,7 @@ from architect_common.enums import (
     EscalationStatus,
     HealthStatus,
 )
+from architect_common.health import HealthResponse
 from architect_common.logging import get_logger
 from architect_common.types import (
     ApprovalGateId,
@@ -70,14 +70,6 @@ router = APIRouter()
 
 
 # ── Request / Response schemas ────────────────────────────────────
-
-
-class HealthResponse(BaseModel):
-    """Response body for GET /health."""
-
-    service: str = "human-interface"
-    status: HealthStatus
-    uptime_seconds: float = 0.0
 
 
 # ── Helpers ───────────────────────────────────────────────────────
@@ -607,6 +599,7 @@ async def health_check(request: Request) -> HealthResponse:
 
     uptime = time.monotonic() - getattr(request.app.state, "started_at", time.monotonic())
     return HealthResponse(
+        service="human-interface",
         status=status,
         uptime_seconds=round(uptime, 2),
     )

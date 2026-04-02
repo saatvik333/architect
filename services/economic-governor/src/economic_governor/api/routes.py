@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from architect_common.enums import EnforcementLevel, HealthStatus
+from architect_common.health import HealthResponse
 from architect_common.types import AgentId
 from economic_governor.budget_tracker import BudgetTracker
 from economic_governor.efficiency_scorer import EfficiencyScorer
@@ -27,14 +28,6 @@ router = APIRouter()
 
 
 # ── Request / Response schemas ────────────────────────────────────
-
-
-class HealthResponse(BaseModel):
-    """Response body for GET /health."""
-
-    service: str = "economic-governor"
-    status: HealthStatus
-    uptime_seconds: float = 0.0
 
 
 class RecordConsumptionRequest(BaseModel):
@@ -171,6 +164,7 @@ async def health_check(request: Request) -> HealthResponse:
 
     uptime = time.monotonic() - getattr(request.app.state, "started_at", time.monotonic())
     return HealthResponse(
+        service="economic-governor",
         status=status,
         uptime_seconds=round(uptime, 2),
     )
