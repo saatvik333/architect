@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
@@ -78,9 +79,11 @@ class ServiceClient:
         path: str,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        """Send an HTTP request to a backend service.
+        """Send an HTTP request to a backend service with retry.
 
-        Raises ``httpx.HTTPStatusError`` on non-2xx responses.
+        Retries up to 3 times with exponential backoff on connection errors
+        and 5xx responses.  Raises ``httpx.HTTPStatusError`` on non-2xx
+        responses that are not retryable.
         """
         if self._client is None:
             msg = "ServiceClient not started — call startup() first"
@@ -88,9 +91,24 @@ class ServiceClient:
 
         url = f"{self._base_url(service)}{path}"
         timeout = self._timeout_for_service(service)
-        resp = await self._client.request(method, url, timeout=timeout, **kwargs)
-        resp.raise_for_status()
-        return resp.json()  # type: ignore[no-any-return]
+        last_exc: Exception | None = None
+
+        for attempt in range(3):
+            try:
+                resp = await self._client.request(method, url, timeout=timeout, **kwargs)
+                resp.raise_for_status()
+                return resp.json()  # type: ignore[no-any-return]
+            except httpx.ConnectError as exc:
+                last_exc = exc
+                if attempt < 2:
+                    await asyncio.sleep(0.5 * (2**attempt))
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code < 500 or attempt == 2:
+                    raise
+                last_exc = exc
+                await asyncio.sleep(0.5 * (2**attempt))
+
+        raise last_exc  # type: ignore[misc]
 
     # ── Typed methods ────────────────────────────────────────────────
 
