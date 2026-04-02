@@ -5,8 +5,6 @@ efficiency scorer and enforcer. Also runs a periodic background loop
 for polling external services.
 """
 
-from __future__ import annotations
-
 import asyncio
 
 from pydantic import BaseModel, Field, ValidationError

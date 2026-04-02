@@ -7,8 +7,6 @@ Computes a per-agent efficiency metric defined as:
 Scores are normalised to [0, 1] across the leaderboard and ranked.
 """
 
-from __future__ import annotations
-
 import asyncio
 from datetime import timedelta
 
@@ -214,7 +212,7 @@ class EfficiencyScorer:
     async def load_persisted_scores(
         cls,
         session_factory: async_sessionmaker[AsyncSession],
-    ) -> EfficiencyScorer:
+    ) -> "EfficiencyScorer":
         """Create an :class:`EfficiencyScorer` and restore agent stats from the DB.
 
         Loads the most recent :class:`AgentEfficiency` row per agent and

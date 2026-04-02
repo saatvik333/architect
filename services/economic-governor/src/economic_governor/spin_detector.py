@@ -4,8 +4,6 @@ An agent is considered "spinning" when it has retried a task beyond
 :pyattr:`max_retries` times without producing a meaningful diff (code change).
 """
 
-from __future__ import annotations
-
 import asyncio
 from collections import OrderedDict
 

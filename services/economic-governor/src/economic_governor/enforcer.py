@@ -5,8 +5,6 @@ consumption crosses a threshold, the Enforcer takes concrete actions such as
 publishing bus events, pausing tasks, or forcing a tier downgrade.
 """
 
-from __future__ import annotations
-
 from collections import deque
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
