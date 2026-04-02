@@ -379,16 +379,11 @@ async def list_approval_gates(
     async with session_factory() as session:
         repo = ApprovalGateRepository(session)
         if status == ApprovalGateStatus.PENDING:
-            rows = await repo.get_pending(limit=limit)
+            rows = await repo.get_pending(limit=limit, action_type=action_type)
         else:
-            rows = await repo.list_all(limit=limit, offset=offset)
+            rows = await repo.list_all(limit=limit, offset=offset, action_type=action_type)
 
-    results = [_gate_to_response(r) for r in rows]
-
-    if action_type is not None:
-        results = [r for r in results if r.action_type == action_type]
-
-    return results
+    return [_gate_to_response(r) for r in rows]
 
 
 @router.get("/api/v1/approval-gates/{gate_id}", response_model=ApprovalGateResponse)
