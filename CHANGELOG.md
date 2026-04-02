@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 3: Intelligence, Autonomy & Human Interface
+
+- **Knowledge & Memory** (Component 9, port 8014): 5-layer memory hierarchy (L0 working through L4 meta-strategy), knowledge acquisition and memory compression Temporal pipelines, pgvector-backed similarity search, pattern extraction and heuristic synthesis via LLM
+- **Economic Governor** (Component 10, port 8015): real-time budget tracking with progressive enforcement (alert/restrict/halt thresholds), efficiency scoring leaderboard, spin detection (kills agents after consecutive no-diff retries), in-memory state with Postgres persistence on enforcement transitions
+- **Human Interface** (Component 14, port 8016): escalation management with configurable approval gates, WebSocket push notifications for real-time dashboard updates, Temporal workflows for escalation timeout and approval coordination
+- **Database migration 005**: 10 new tables — `knowledge_entries`, `knowledge_observations`, `heuristic_rules`, `meta_strategies`, `budget_records`, `agent_efficiency_scores`, `enforcement_actions`, `escalations`, `approval_gates`, `approval_votes`
+- **30+ API endpoints** across three new services (knowledge queries, budget status, escalations, approvals, progress, activity feed, leaderboard, etc.)
+- **WebSocket support**: Human Interface service provides bidirectional WebSocket for escalation notifications, approval events, and progress updates; API Gateway proxies WebSocket connections
+- **Dashboard extensions**: 4 new pages — Escalations (approve/reject decisions), Activity (real-time event stream via WebSocket + polling), Budget (consumption and phase breakdown), Progress (task graph and coverage metrics)
+- **New event types**: 15 new `EventType` variants for budget enforcement, knowledge lifecycle, escalation management, and approval workflows
+- **New branded ID types**: `KnowledgeId`, `PatternId`, `HeuristicId`, `EscalationId`, `ApprovalGateId`
+- **New enums**: `EnforcementLevel`, `BudgetPhase`, `MemoryLayer`, `ContentType`, `ObservationType`, `EscalationCategory`, `EscalationSeverity`, `EscalationStatus`, `ApprovalGateStatus`
+- **Configuration variables**: `ECON_GOV_ALERT_THRESHOLD_PCT`, `ECON_GOV_RESTRICT_THRESHOLD_PCT`, `ECON_GOV_HALT_THRESHOLD_PCT`, `ARCHITECT_WS_TOKEN`, `KM_COMPRESSION_BATCH_SIZE`, `HUMAN_INTERFACE_DEFAULT_ESCALATION_EXPIRY_MINUTES`
+- All three Phase 3 services instrumented with `init_observability()` (OpenTelemetry tracing + Prometheus metrics)
+- Prometheus scrape targets added for ports 8014, 8015, 8016
+
 ### Added — Phase D Testing & Phase E Code Quality
 
 - **Temporal activity tests** (D1) — 40 new tests across 4 services (task-graph, coding-agent, eval-engine, world-state-ledger), covering all critical activity functions
