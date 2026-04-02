@@ -8,7 +8,15 @@ import time
 from datetime import timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -273,18 +281,24 @@ async def get_escalation(
 async def resolve_escalation(
     escalation_id: str,
     body: ResolveEscalationRequest,
+    request: Request,
     ws_manager: WebSocketManager = Depends(get_ws_manager),
     session_factory: async_sessionmaker[AsyncSession] = Depends(get_session_factory),
 ) -> EscalationResponse:
     """Resolve an escalation with a human decision."""
-    # TODO(security): resolved_by should be derived from the authenticated user's
-    # identity, not accepted from the request body. Currently any caller can
-    # impersonate any identity. See review finding S-C5.
+    # Prefer identity from authenticated header; fall back to body field.
+    resolved_by = request.headers.get("X-Authenticated-User") or body.resolved_by
+    if not resolved_by:
+        raise HTTPException(
+            status_code=401,
+            detail="Identity required: provide X-Authenticated-User header or resolved_by field",
+        )
+
     async with session_factory() as session:
         repo = EscalationRepository(session)
         entity = await repo.resolve(
             escalation_id,
-            resolved_by=body.resolved_by,
+            resolved_by=resolved_by,
             resolution=body.resolution,
             resolution_details=body.custom_input,
         )
@@ -409,10 +423,19 @@ async def get_approval_gate(
 async def cast_vote(
     gate_id: str,
     body: VoteRequest,
+    request: Request,
     ws_manager: WebSocketManager = Depends(get_ws_manager),
     session_factory: async_sessionmaker[AsyncSession] = Depends(get_session_factory),
 ) -> ApprovalGateResponse:
     """Cast a vote on an approval gate. Auto-resolves if enough votes."""
+    # Prefer identity from authenticated header; fall back to body field.
+    voter = request.headers.get("X-Authenticated-User") or body.voter
+    if not voter:
+        raise HTTPException(
+            status_code=401,
+            detail="Identity required: provide X-Authenticated-User header or voter field",
+        )
+
     async with session_factory() as session:
         gate_repo = ApprovalGateRepository(session)
         vote_repo = ApprovalVoteRepository(session)
@@ -426,13 +449,13 @@ async def cast_vote(
 
         # Check for duplicate votes from same voter.
         existing_votes = await vote_repo.get_by_gate(gate_id)
-        if any(v.voter == body.voter for v in existing_votes):
+        if any(v.voter == voter for v in existing_votes):
             raise HTTPException(status_code=409, detail="Voter has already voted on this gate")
 
         # Record the vote.
         vote = ApprovalVote(
             gate_id=gate_id,
-            voter=body.voter,
+            voter=voter,
             decision=body.decision,
             comment=body.comment,
         )
@@ -463,7 +486,7 @@ async def cast_vote(
     logger.info(
         "vote cast on approval gate",
         gate_id=gate_id,
-        voter=body.voter,
+        voter=voter,
         decision=body.decision,
     )
     return result

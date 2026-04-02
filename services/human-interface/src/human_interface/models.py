@@ -64,9 +64,9 @@ class CreateEscalationRequest(BaseModel):
 class ResolveEscalationRequest(BaseModel):
     """Request body for resolving an escalation."""
 
-    resolved_by: str
     resolution: str
     custom_input: dict[str, Any] | None = None
+    resolved_by: str | None = None  # Deprecated: use X-Authenticated-User header
 
 
 class EscalationResponse(ArchitectBase):
@@ -117,9 +117,9 @@ class CreateApprovalGateRequest(BaseModel):
 class VoteRequest(BaseModel):
     """Request body for casting a vote on an approval gate."""
 
-    voter: str
     decision: Literal["approve", "deny"]
     comment: str | None = None
+    voter: str | None = None  # Deprecated: use X-Authenticated-User header
 
 
 class ApprovalGateResponse(ArchitectBase):
@@ -162,7 +162,7 @@ class ProgressSummary(ArchitectBase):
     tests_passing: int = 0
     tests_failing: int = 0
     coverage_pct: float = 0.0
-    blockers: list[str] = Field(default_factory=list)
+    blockers: list[EscalationResponse] = Field(default_factory=list)
     recent_events: list[ActivityEvent] = Field(default_factory=list)
 
 
