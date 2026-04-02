@@ -105,6 +105,9 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
       redis:
         image: redis:7
+        # CI Redis runs without auth intentionally — service containers are
+        # isolated to the runner and not reachable externally. Production and
+        # local-dev Redis require ARCHITECT_REDIS_PASSWORD (set by dev-setup.sh).
         ports:
           - 6379:6379
         options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
