@@ -11,9 +11,10 @@ from typing import Any
 
 from architect_common.enums import ContentType, MemoryLayer
 from architect_common.logging import get_logger
-from architect_common.types import new_knowledge_id, new_pattern_id
+from architect_common.types import new_knowledge_id
 from architect_llm.client import LLMClient
 from architect_llm.models import LLMRequest
+from knowledge_memory.llm_utils import parse_llm_json_array
 from knowledge_memory.models import KnowledgeEntry
 from knowledge_memory.similarity import cosine_similarity
 
@@ -50,10 +51,8 @@ def cluster_observations(
             if centroid and cosine_similarity(emb, centroid) >= similarity_threshold:
                 clusters[i].append(obs)
                 # Update centroid as running average
-                centroids[i] = [
-                    (c * len(clusters[i]) + e) / (len(clusters[i]) + 1)
-                    for c, e in zip(centroid, emb, strict=False)
-                ]
+                n = len(clusters[i])  # already includes appended item
+                centroids[i] = [(c * (n - 1) + e) / n for c, e in zip(centroid, emb, strict=False)]
                 placed = True
                 break
 
@@ -98,8 +97,8 @@ async def extract_patterns(
             {
                 "role": "user",
                 "content": (
-                    f"Domain: {domain}\n\n"
-                    f"Observations ({len(observations)} total):\n{obs_text}\n\n"
+                    f"Domain: <user_input>{domain}</user_input>\n\n"
+                    f"Observations ({len(observations)} total):\n<user_input>{obs_text}</user_input>\n\n"
                     "Extract reusable patterns from these observations. "
                     "Return ONLY a JSON array."
                 ),
@@ -113,27 +112,10 @@ async def extract_patterns(
 
     # Parse the LLM response
     patterns: list[KnowledgeEntry] = []
-    try:
-        raw_patterns = json.loads(response.content)
-        if not isinstance(raw_patterns, list):
-            raw_patterns = [raw_patterns]
+    raw_patterns = parse_llm_json_array(response.content, logger)
 
-        for rp in raw_patterns:
-            pattern_id = new_pattern_id()
-            entry = KnowledgeEntry(
-                id=new_knowledge_id(),
-                layer=MemoryLayer.L2_PATTERN,
-                topic=domain,
-                title=rp.get("title", "Extracted pattern"),
-                content=rp.get("content", response.content),
-                content_type=ContentType.PATTERN,
-                confidence=float(rp.get("confidence", 0.5)),
-                tags=rp.get("tags", []),
-                source=f"pattern_extraction:{pattern_id}",
-            )
-            patterns.append(entry)
-    except (json.JSONDecodeError, TypeError):
-        logger.warning("failed to parse LLM pattern response, using raw content")
+    if not raw_patterns:
+        # Fallback: preserve the raw LLM content as a single entry
         patterns.append(
             KnowledgeEntry(
                 id=new_knowledge_id(),
@@ -146,6 +128,20 @@ async def extract_patterns(
                 source="pattern_extraction:parse_fallback",
             )
         )
+    else:
+        for rp in raw_patterns:
+            entry = KnowledgeEntry(
+                id=new_knowledge_id(),
+                layer=MemoryLayer.L2_PATTERN,
+                topic=domain,
+                title=rp.get("title", "Extracted pattern"),
+                content=rp.get("content", response.content),
+                content_type=ContentType.PATTERN,
+                confidence=float(rp.get("confidence", 0.5)),
+                tags=rp.get("tags", []),
+                source="pattern_extraction",
+            )
+            patterns.append(entry)
 
     logger.info("extracted patterns", count=len(patterns), domain=domain)
     return patterns
