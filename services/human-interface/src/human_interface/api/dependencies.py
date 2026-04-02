@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from architect_common.dependencies import ServiceDependency
 from human_interface.config import HumanInterfaceConfig
 from human_interface.ws_manager import WebSocketManager
 
@@ -19,86 +21,52 @@ def get_config() -> HumanInterfaceConfig:
 
 # ── WebSocket manager ─────────────────────────────────────────────
 
-_ws_manager: WebSocketManager | None = None
+_ws_manager = ServiceDependency[WebSocketManager]("WebSocketManager")
 
-
-def get_ws_manager() -> WebSocketManager:
-    """Return the shared :class:`WebSocketManager` instance."""
-    global _ws_manager
-    if _ws_manager is None:
-        _ws_manager = WebSocketManager()
-    return _ws_manager
-
-
-def set_ws_manager(manager: WebSocketManager) -> None:
-    """Override the shared WebSocket manager (used during service startup)."""
-    global _ws_manager
-    _ws_manager = manager
-
+get_ws_manager = _ws_manager.get
+set_ws_manager = _ws_manager.set
 
 # ── HTTP client ───────────────────────────────────────────────────
 
-_http_client: httpx.AsyncClient | None = None
+_http_client = ServiceDependency[httpx.AsyncClient]("HTTP client")
 
-
-def get_http_client() -> httpx.AsyncClient:
-    """Return the shared :class:`httpx.AsyncClient` instance.
-
-    Raises:
-        RuntimeError: If :func:`set_http_client` has not been called.
-    """
-    if _http_client is None:
-        msg = "HTTP client not initialised. Call set_http_client() during startup."
-        raise RuntimeError(msg)
-    return _http_client
-
-
-def set_http_client(client: httpx.AsyncClient) -> None:
-    """Override the shared HTTP client (used during service startup)."""
-    global _http_client
-    _http_client = client
-
+get_http_client = _http_client.get
+set_http_client = _http_client.set
 
 # ── Database engine / session factory ────────────────────────────
 
-_db_engine: AsyncEngine | None = None
-_session_factory: async_sessionmaker[AsyncSession] | None = None
+_db_engine = ServiceDependency[AsyncEngine]("Database engine")
+_session_factory = ServiceDependency[async_sessionmaker[AsyncSession]]("Session factory")
 
-
-def get_db_engine() -> AsyncEngine:
-    """Return the shared async database engine."""
-    if _db_engine is None:
-        msg = "Database engine not initialised. Call set_db_engine() during startup."
-        raise RuntimeError(msg)
-    return _db_engine
-
-
-def get_session_factory() -> async_sessionmaker[AsyncSession]:
-    """Return the shared session factory."""
-    if _session_factory is None:
-        msg = "Session factory not initialised. Call set_db_engine() during startup."
-        raise RuntimeError(msg)
-    return _session_factory
+get_db_engine = _db_engine.get
+get_session_factory = _session_factory.get
 
 
 def set_db_engine(engine: AsyncEngine, factory: async_sessionmaker[AsyncSession]) -> None:
     """Set the shared database engine and session factory (called during startup)."""
-    global _db_engine, _session_factory
-    _db_engine = engine
-    _session_factory = factory
+    _db_engine.set(engine)
+    _session_factory.set(factory)
 
+
+# ── Temporal client ────────────────────────────────────────────────
+
+# Temporal client uses Any to avoid a heavy import; callers know the concrete type.
+_temporal_client: ServiceDependency[Any] = ServiceDependency("Temporal client")
+
+get_temporal_client = _temporal_client.get
+set_temporal_client = _temporal_client.set
 
 # ── Cleanup ───────────────────────────────────────────────────────
 
 
 async def cleanup() -> None:
     """Close shared resources on shutdown."""
-    global _ws_manager, _http_client, _db_engine, _session_factory
-    if _http_client is not None:
-        await _http_client.aclose()
-    if _db_engine is not None:
-        await _db_engine.dispose()
-    _ws_manager = None
-    _http_client = None
-    _db_engine = None
-    _session_factory = None
+    await _http_client.cleanup()  # calls aclose()
+    # AsyncEngine uses dispose(), not aclose() — handle manually
+    engine = _db_engine._instance
+    if engine is not None:
+        await engine.dispose()
+    _db_engine._instance = None
+    _session_factory._instance = None
+    _ws_manager._instance = None
+    _temporal_client._instance = None
