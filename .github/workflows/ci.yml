@@ -95,7 +95,7 @@ jobs:
     needs: [lint, typecheck, test, security]
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: architect
           POSTGRES_PASSWORD: ci_test_password
