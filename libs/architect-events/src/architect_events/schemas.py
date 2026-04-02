@@ -8,6 +8,7 @@ from pydantic import Field
 
 from architect_common.enums import (
     AgentType,
+    ApprovalGateStatus,
     EnforcementLevel,
     EscalationCategory,
     EscalationSeverity,
@@ -22,6 +23,7 @@ from architect_common.types import (
     ArchitectBase,
     EscalationId,
     EventId,
+    HeuristicId,
     KnowledgeId,
     LedgerVersion,
     PatternId,
@@ -152,7 +154,7 @@ class PatternExtractedEvent(ArchitectBase):
 class HeuristicCreatedEvent(ArchitectBase):
     """Emitted when patterns are synthesized into a heuristic rule."""
 
-    heuristic_id: str
+    heuristic_id: HeuristicId
     domain: str
     condition: str
     action: str
@@ -252,4 +254,4 @@ class ApprovalResolvedEvent(ArchitectBase):
     """Emitted when an approval gate is resolved."""
 
     gate_id: ApprovalGateId
-    status: str  # "approved" | "denied" | "expired"
+    status: ApprovalGateStatus
