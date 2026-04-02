@@ -18,7 +18,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for fast package management inside the sandbox
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.5.14 /uv /usr/local/bin/uv
 
 # Create a non-root user with restricted permissions
 RUN groupadd --gid 1000 sandbox && \
