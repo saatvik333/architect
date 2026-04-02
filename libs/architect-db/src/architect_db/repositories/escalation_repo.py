@@ -82,18 +82,19 @@ class EscalationRepository(BaseRepository[Escalation]):
         return list(result.scalars().all())
 
     async def get_stats(self) -> dict[str, int]:
-        total_stmt = select(func.count()).select_from(Escalation)
-        pending_stmt = (
-            select(func.count()).select_from(Escalation).where(Escalation.status == "pending")
-        )
-        resolved_stmt = (
-            select(func.count()).select_from(Escalation).where(Escalation.status == "resolved")
-        )
+        from sqlalchemy import case
 
-        total = (await self._session.execute(total_stmt)).scalar() or 0
-        pending = (await self._session.execute(pending_stmt)).scalar() or 0
-        resolved = (await self._session.execute(resolved_stmt)).scalar() or 0
+        stmt = select(
+            func.count().label("total"),
+            func.count(case((Escalation.status == "pending", 1))).label("pending"),
+            func.count(case((Escalation.status == "resolved", 1))).label("resolved"),
+        ).select_from(Escalation)
 
+        result = await self._session.execute(stmt)
+        row = result.one()
+        total = row.total or 0
+        pending = row.pending or 0
+        resolved = row.resolved or 0
         return {
             "total": total,
             "pending": pending,
