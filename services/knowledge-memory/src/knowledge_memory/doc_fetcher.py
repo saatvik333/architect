@@ -6,12 +6,73 @@ using BeautifulSoup for downstream knowledge ingestion.
 
 from __future__ import annotations
 
+import ipaddress
+import socket
+from urllib.parse import urlparse
+
 import httpx
 from bs4 import BeautifulSoup
 
 from architect_common.logging import get_logger
 
 logger = get_logger(component="knowledge_memory.doc_fetcher")
+
+_BLOCKED_SCHEMES = {"file", "ftp", "gopher", "data", "javascript"}
+_ALLOWED_SCHEMES = {"http", "https"}
+
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fd00::/8"),
+]
+
+
+def validate_url(url: str) -> None:
+    """Validate a URL to prevent Server-Side Request Forgery (SSRF).
+
+    Checks the URL scheme and resolves the hostname to ensure it does not
+    point to a private or internal IP address.
+
+    Raises:
+        ValueError: If the URL fails validation.
+    """
+    parsed = urlparse(url)
+
+    if not parsed.scheme:
+        raise ValueError(f"URL has no scheme: {url}")
+
+    if parsed.scheme.lower() in _BLOCKED_SCHEMES:
+        raise ValueError(f"Blocked URL scheme: {parsed.scheme}")
+
+    if parsed.scheme.lower() not in _ALLOWED_SCHEMES:
+        raise ValueError(
+            f"URL scheme '{parsed.scheme}' is not allowed; only http and https are permitted"
+        )
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError(f"URL has no hostname: {url}")
+
+    try:
+        addr_infos = socket.getaddrinfo(hostname, parsed.port or 443)
+    except socket.gaierror as exc:
+        raise ValueError(f"Cannot resolve hostname '{hostname}': {exc}") from exc
+
+    for _family, _type, _proto, _canonname, sockaddr in addr_infos:
+        ip = ipaddress.ip_address(sockaddr[0])
+        for network in _BLOCKED_NETWORKS:
+            if ip in network:
+                logger.warning(
+                    "ssrf_blocked",
+                    url=url,
+                    resolved_ip=str(ip),
+                    blocked_network=str(network),
+                )
+                raise ValueError(f"URL resolves to blocked internal address {ip} (in {network})")
 
 
 async def fetch_documentation(
@@ -40,10 +101,20 @@ async def fetch_documentation(
         httpx.HTTPStatusError: On non-2xx HTTP responses.
         httpx.TimeoutException: On request timeout.
     """
+    validate_url(url)
     max_bytes = max_size_kb * 1024
 
     async def _do_fetch(c: httpx.AsyncClient) -> str:
         response = await c.get(url)
+        # Validate redirect targets to prevent SSRF bypass via redirect chains
+        if response.status_code in (301, 302, 307, 308):
+            redirect_url = response.headers.get("location")
+            if redirect_url:
+                validate_url(redirect_url)
+                async with httpx.AsyncClient(
+                    timeout=timeout_seconds, follow_redirects=False
+                ) as redirect_client:
+                    response = await redirect_client.get(redirect_url)
         response.raise_for_status()
         raw_bytes = response.content[:max_bytes]
         content_type = response.headers.get("content-type", "")
@@ -59,7 +130,7 @@ async def fetch_documentation(
 
     async with httpx.AsyncClient(
         timeout=timeout_seconds,
-        follow_redirects=True,
+        follow_redirects=False,
     ) as new_client:
         return await _do_fetch(new_client)
 
