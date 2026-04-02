@@ -104,17 +104,16 @@ async def fetch_documentation(
     validate_url(url)
     max_bytes = max_size_kb * 1024
 
-    async def _do_fetch(c: httpx.AsyncClient) -> str:
-        response = await c.get(url)
-        # Validate redirect targets to prevent SSRF bypass via redirect chains
-        if response.status_code in (301, 302, 307, 308):
+    def _validate_redirect(response: httpx.Response) -> None:
+        """Validate redirect targets to prevent SSRF bypass via redirect chains."""
+        if response.is_redirect:
             redirect_url = response.headers.get("location")
             if redirect_url:
                 validate_url(redirect_url)
-                async with httpx.AsyncClient(
-                    timeout=timeout_seconds, follow_redirects=False
-                ) as redirect_client:
-                    response = await redirect_client.get(redirect_url)
+
+    async def _do_fetch(c: httpx.AsyncClient) -> str:
+        c.event_hooks["response"] = [_validate_redirect]
+        response = await c.get(url)
         response.raise_for_status()
         raw_bytes = response.content[:max_bytes]
         content_type = response.headers.get("content-type", "")
@@ -130,7 +129,8 @@ async def fetch_documentation(
 
     async with httpx.AsyncClient(
         timeout=timeout_seconds,
-        follow_redirects=False,
+        follow_redirects=True,
+        max_redirects=5,
     ) as new_client:
         return await _do_fetch(new_client)
 
