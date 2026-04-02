@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, ValidationError
 from architect_common.enums import EnforcementLevel
 from architect_common.logging import get_logger
 from architect_common.types import AgentId, TaskId
-from architect_events.schemas import EventEnvelope
+from architect_events.schemas import EventEnvelope, TaskCompletedPayload
 from economic_governor.budget_tracker import BudgetTracker
 from economic_governor.config import EconomicGovernorConfig
 from economic_governor.efficiency_scorer import EfficiencyScorer
@@ -30,16 +30,6 @@ class AgentCompletedPayload(BaseModel):
     agent_id: str
     tokens_consumed: int = Field(ge=0)
     cost_usd: float = Field(ge=0)
-
-
-class TaskCompletedPayload(BaseModel):
-    """Expected payload for TASK_COMPLETED events."""
-
-    agent_id: str
-    quality_score: float = Field(default=1.0)
-    verdict: str = Field(default="pass")
-    tokens_consumed: int = Field(default=0, ge=0)
-    cost_usd: float = Field(default=0.0, ge=0)
 
 
 class RoutingDecisionPayload(BaseModel):

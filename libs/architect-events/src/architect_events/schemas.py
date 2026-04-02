@@ -69,6 +69,22 @@ class TaskCompletedEvent(ArchitectBase):
     verdict: EvalVerdict
 
 
+class TaskCompletedPayload(ArchitectBase):
+    """Canonical payload for TASK_COMPLETED events.
+
+    Covers the superset of fields needed by all consumers. Uses relaxed
+    string types so it can be ``model_validate``-d directly from a raw
+    event payload dict.
+    """
+
+    task_id: str = ""
+    agent_id: str = ""
+    verdict: str = ""
+    quality_score: float = Field(default=1.0)
+    tokens_consumed: int = Field(default=0, ge=0)
+    cost_usd: float = Field(default=0.0, ge=0)
+
+
 class TaskFailedEvent(ArchitectBase):
     """Emitted when a task fails."""
 
