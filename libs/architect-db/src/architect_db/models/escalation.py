@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import Boolean, DateTime, Float, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -86,8 +87,14 @@ class ApprovalVote(UUIDPrimaryKeyMixin, Base):
     """
 
     __tablename__ = "approval_votes"
+    __table_args__ = (sa.UniqueConstraint("gate_id", "voter", name="uq_approval_votes_gate_voter"),)
 
-    gate_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    gate_id: Mapped[str] = mapped_column(
+        Text,
+        sa.ForeignKey("approval_gates.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     voter: Mapped[str] = mapped_column(Text, nullable=False)
     decision: Mapped[str] = mapped_column(Text, nullable=False)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
