@@ -348,21 +348,21 @@ class KnowledgeStore:
         success: bool,
     ) -> None:
         """Record an outcome for a heuristic, updating counters and confidence."""
-        col = "success_count" if success else "failure_count"
         async with self._session_factory() as session:
             await session.execute(
-                text(f"""
+                text("""
                     UPDATE heuristics
-                    SET {col} = {col} + 1,
+                    SET success_count = success_count + CASE WHEN :is_success THEN 1 ELSE 0 END,
+                        failure_count = failure_count + CASE WHEN :is_success THEN 0 ELSE 1 END,
                         confidence = CASE
                             WHEN (success_count + failure_count + 1) > 0
-                            THEN (success_count + CASE WHEN :success THEN 1 ELSE 0 END)::float
+                            THEN (success_count + CASE WHEN :is_success THEN 1 ELSE 0 END)::float
                                  / (success_count + failure_count + 1)::float
                             ELSE confidence
                         END
                     WHERE id = :id
                 """),
-                {"id": str(heuristic_id), "success": success},
+                {"id": str(heuristic_id), "is_success": success},
             )
             await session.commit()
 
