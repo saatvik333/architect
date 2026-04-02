@@ -83,7 +83,11 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 plugins = ["pydantic.mypy"]
-exclude = ["^.*/tests/"]
+[[tool.mypy.overrides]]
+module = ["*.tests.*", "tests.*"]
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+warn_return_any = false
 
 [[tool.mypy.overrides]]
 module = [
