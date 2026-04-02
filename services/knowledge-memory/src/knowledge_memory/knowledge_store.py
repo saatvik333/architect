@@ -1,8 +1,9 @@
 """Core data access layer for knowledge entries and observations.
 
 Uses SQLAlchemy async sessions for PostgreSQL access.  Embeddings are stored
-as JSONB arrays and cosine similarity is computed in Python (avoiding a hard
-dependency on the pgvector extension for the MVP).
+in both a JSONB column (backwards-compat) and a pgvector ``vector(384)``
+column.  Similarity search uses the pgvector ``<=>`` cosine-distance operator
+with an HNSW index for O(log N) nearest-neighbour lookups.
 """
 
 from __future__ import annotations
@@ -23,7 +24,6 @@ from architect_common.types import (
     TaskId,
     utcnow,
 )
-from knowledge_memory.similarity import cosine_similarity
 
 logger = get_logger(component="knowledge_memory.knowledge_store")
 
@@ -62,17 +62,19 @@ class KnowledgeStore:
                 text("""
                     INSERT INTO knowledge_entries
                         (id, layer, topic, title, content, content_type,
-                         confidence, tags, embedding, version_tag, source,
+                         confidence, tags, embedding, embedding_vec, version_tag, source,
                          usage_count, active, created_at, updated_at)
                     VALUES
                         (:id, :layer, :topic, :title, :content, :content_type,
-                         :confidence, :tags::jsonb, :embedding::jsonb, :version_tag, :source,
+                         :confidence, :tags::jsonb, :embedding::jsonb,
+                         :embedding_vec::vector, :version_tag, :source,
                          0, true, :now, :now)
                     ON CONFLICT (id) DO UPDATE SET
                         content = EXCLUDED.content,
                         confidence = EXCLUDED.confidence,
                         tags = EXCLUDED.tags,
                         embedding = EXCLUDED.embedding,
+                        embedding_vec = EXCLUDED.embedding_vec,
                         version_tag = EXCLUDED.version_tag,
                         updated_at = EXCLUDED.updated_at
                 """),
@@ -86,6 +88,7 @@ class KnowledgeStore:
                     "confidence": confidence,
                     "tags": _to_json(tags or []),
                     "embedding": _to_json(embedding or []),
+                    "embedding_vec": str(embedding) if embedding else None,
                     "version_tag": version_tag,
                     "source": source,
                     "now": now,
@@ -113,10 +116,10 @@ class KnowledgeStore:
         content_type: ContentType | None = None,
         limit: int = 10,
     ) -> list[dict[str, Any]]:
-        """Search knowledge entries by cosine similarity.
+        """Search knowledge entries by cosine similarity via pgvector.
 
-        Fetches active entries (optionally filtered by layer/topic/content_type)
-        and ranks them by cosine similarity to *query_embedding* in Python.
+        Uses the pgvector ``<=>`` cosine-distance operator with an HNSW index
+        for server-side nearest-neighbour ranking.
 
         When *query_embedding* is empty, similarity ranking is skipped and results
         are returned in insertion order (useful for filter-only queries).
@@ -144,23 +147,20 @@ class KnowledgeStore:
                 result = await session.execute(text(query), params)
                 return [dict(r) for r in result.mappings().all()]
 
-        query = f"SELECT * FROM knowledge_entries WHERE {where}"
+        # Use pgvector cosine distance operator for server-side ranking
+        query = f"""
+            SELECT *, 1 - (embedding_vec <=> :query_vec::vector) AS similarity
+            FROM knowledge_entries
+            WHERE {where} AND embedding_vec IS NOT NULL
+            ORDER BY embedding_vec <=> :query_vec::vector
+            LIMIT :limit
+        """
+        params["query_vec"] = str(query_embedding)
+        params["limit"] = limit
 
         async with self._session_factory() as session:
             result = await session.execute(text(query), params)
-            rows = [dict(r) for r in result.mappings().all()]
-
-        # Rank by cosine similarity
-        scored: list[tuple[float, dict[str, Any]]] = []
-        for row in rows:
-            emb = row.get("embedding") or []
-            if isinstance(emb, str):
-                emb = json.loads(emb)
-            sim = cosine_similarity(query_embedding, emb)
-            scored.append((sim, row))
-
-        scored.sort(key=lambda x: x[0], reverse=True)
-        return [row for _, row in scored[:limit]]
+            return [dict(r) for r in result.mappings().all()]
 
     async def increment_usage(self, entry_id: KnowledgeId) -> None:
         """Bump the usage counter for a knowledge entry."""
