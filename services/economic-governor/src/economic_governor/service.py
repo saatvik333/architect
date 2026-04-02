@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from architect_common.enums import EventType
 from architect_common.logging import get_logger, setup_logging
+from architect_db.engine import create_engine, create_session_factory
 from architect_events.publisher import EventPublisher
 from architect_events.subscriber import EventSubscriber
 from architect_observability import init_observability, shutdown_observability
@@ -27,6 +28,7 @@ from economic_governor.efficiency_scorer import EfficiencyScorer
 from economic_governor.enforcer import Enforcer
 from economic_governor.monitor import Monitor
 from economic_governor.spin_detector import SpinDetector
+from economic_governor.temporal.worker import run_worker
 
 logger = get_logger(component="economic_governor.service")
 
@@ -34,18 +36,24 @@ logger = get_logger(component="economic_governor.service")
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Manage startup and shutdown lifecycle for the Economic Governor."""
+    import time
+
+    app.state.started_at = time.monotonic()
     config: EconomicGovernorConfig = app.state.config
+
+    # ── Database session factory ─────────────────────────────────────
+    db_engine = create_engine(config.architect.postgres.dsn)
+    session_factory = create_session_factory(db_engine)
 
     # ── Event publisher ──────────────────────────────────────────────
     event_publisher = EventPublisher(config.architect.redis.url)
     await event_publisher.connect()
 
     # ── Core components ──────────────────────────────────────────────
-    budget_tracker = BudgetTracker(config)
+    budget_tracker = await BudgetTracker.load_persisted_state(session_factory, config)
     spin_detector = SpinDetector(config)
-    efficiency_scorer = EfficiencyScorer()
-    enforcer = Enforcer(config, event_publisher)
-    await enforcer.startup()
+    efficiency_scorer = await EfficiencyScorer.load_persisted_scores(session_factory)
+    enforcer = Enforcer(config, event_publisher, session_factory=session_factory)
 
     # Wire into DI.
     set_budget_tracker(budget_tracker)
@@ -88,6 +96,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # ── Background monitoring loop ───────────────────────────────────
     monitor_task = monitor.start()
 
+    # ── Temporal worker (shares budget_tracker / efficiency_scorer) ─
+    worker_task: asyncio.Task[None] | None = None
+    try:
+        worker_task = asyncio.create_task(
+            run_worker(
+                config=config,
+                budget_tracker=budget_tracker,
+                efficiency_scorer=efficiency_scorer,
+            )
+        )
+        logger.info("temporal worker started as background task")
+    except Exception:
+        logger.warning("temporal worker failed to start — running without it", exc_info=True)
+
     logger.info("economic-governor service started", port=config.port)
 
     yield
@@ -95,12 +117,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # ── Shutdown ─────────────────────────────────────────────────────
     shutdown_observability(app)
 
+    if worker_task is not None:
+        worker_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await worker_task
+
     monitor.stop()
     with suppress(asyncio.CancelledError):
         await monitor_task
 
     await subscriber.stop()
     await event_publisher.close()
+    await db_engine.dispose()
     await cleanup()
 
     logger.info("economic-governor service stopped")

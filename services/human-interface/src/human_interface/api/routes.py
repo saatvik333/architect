@@ -68,10 +68,6 @@ logger = get_logger(component="human_interface.api.routes")
 
 router = APIRouter()
 
-# TODO: Move to app.state via lifespan handler so uptime reflects actual
-# server start rather than module-import time.
-_SERVICE_STARTED_AT = time.monotonic()
-
 
 # ── Request / Response schemas ────────────────────────────────────
 
@@ -595,7 +591,7 @@ async def websocket_endpoint(
 
 
 @router.get("/health", response_model=HealthResponse)
-async def health_check() -> HealthResponse:
+async def health_check(request: Request) -> HealthResponse:
     """Service health check endpoint."""
     status = HealthStatus.HEALTHY
 
@@ -609,7 +605,8 @@ async def health_check() -> HealthResponse:
     except RuntimeError:
         status = HealthStatus.DEGRADED
 
+    uptime = time.monotonic() - getattr(request.app.state, "started_at", time.monotonic())
     return HealthResponse(
         status=status,
-        uptime_seconds=round(time.monotonic() - _SERVICE_STARTED_AT, 1),
+        uptime_seconds=round(uptime, 2),
     )

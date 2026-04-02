@@ -34,6 +34,9 @@ logger = get_logger(component="human_interface.service")
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Manage startup and shutdown lifecycle for the Human Interface."""
+    import time
+
+    app.state.started_at = time.monotonic()
     config: HumanInterfaceConfig = app.state.config
 
     # ── Event publisher ──────────────────────────────────────────────
