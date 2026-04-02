@@ -418,11 +418,11 @@ class StateManager:
                     f"expected {mutation.old_value!r}, got {current!r}",
                 )
 
-        # Budget constraint: simulate mutations on a deep copy via _apply_mutations.
-        simulated_state = StateManager._apply_mutations(
-            WorldState.model_validate(copy.deepcopy(data)), mutations
-        )
-        simulated = simulated_state.model_dump(mode="json")
+        # Budget constraint: simulate mutations on a deep copy of the dict
+        # directly, avoiding an extra model_validate + model_dump round-trip.
+        simulated = copy.deepcopy(data)
+        for mutation in mutations:
+            StateManager._set_at_path(simulated, mutation.path, mutation.new_value)
 
         remaining = simulated.get("budget", {}).get("remaining_tokens", 0)
         if isinstance(remaining, (int, float)) and remaining < 0:
