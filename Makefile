@@ -30,7 +30,7 @@ typecheck:
 	uv run mypy libs/ services/ apps/
 
 test:
-	uv run pytest libs/ services/ apps/ -x -q --cov=libs --cov=services --cov=apps --cov-fail-under=60
+	uv run pytest libs/ services/ apps/ -x -q --cov=libs --cov=services --cov=apps --cov-fail-under=75
 
 test-integration:
 	uv run pytest tests/integration/ -m integration -x -q
