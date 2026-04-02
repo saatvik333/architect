@@ -7,11 +7,14 @@ publishing bus events, pausing tasks, or forcing a tier downgrade.
 
 from __future__ import annotations
 
-import httpx
+from collections import deque
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from architect_common.enums import EnforcementLevel, EventType, ModelTier
 from architect_common.logging import get_logger
-from architect_common.types import TaskId, _prefixed_uuid, utcnow
+from architect_common.types import ArchitectBase, TaskId, _prefixed_uuid
+from architect_db.models.budget import EnforcementAction
 from architect_events.publisher import EventPublisher
 from architect_events.schemas import (
     BudgetHaltEvent,
@@ -34,25 +37,42 @@ class Enforcer:
         self,
         config: EconomicGovernorConfig,
         publisher: EventPublisher,
+        session_factory: async_sessionmaker[AsyncSession] | None = None,
     ) -> None:
         self._config = config
         self._publisher = publisher
-        self._client: httpx.AsyncClient | None = None
-        self._history: list[EnforcementRecord] = []
+        self._session_factory = session_factory
+        self._history: deque[EnforcementRecord] = deque(maxlen=1000)
 
-    # ── Lifecycle ────────────────────────────────────────────────────
+    # ── Shared enforcement ceremony ───────────────────────────────────
 
-    async def startup(self) -> None:
-        """Create shared HTTP client for communicating with other services."""
-        self._client = httpx.AsyncClient(timeout=httpx.Timeout(10.0))
-        logger.info("enforcer HTTP client started")
+    async def _enforce(
+        self,
+        level: EnforcementLevel,
+        action_type: str,
+        event_type: EventType,
+        payload: ArchitectBase,
+        details: dict[str, object],
+        consumed_pct: float,
+        target_id: str | None = None,
+    ) -> None:
+        """Shared enforcement ceremony: publish event, record, persist, log."""
+        envelope = EventEnvelope(
+            type=event_type,
+            payload=payload.model_dump(mode="json"),
+        )
+        await self._publisher.publish(envelope)
 
-    async def shutdown(self) -> None:
-        """Close the shared HTTP client."""
-        if self._client is not None:
-            await self._client.aclose()
-            self._client = None
-            logger.info("enforcer HTTP client stopped")
+        record = EnforcementRecord(
+            id=_prefixed_uuid("enf"),
+            level=level,
+            action_type=action_type,
+            target_id=target_id,
+            details=details,
+            budget_consumed_pct=consumed_pct,
+        )
+        self._history.append(record)
+        await self._persist_action(record)
 
     # ── Enforcement actions ──────────────────────────────────────────
 
@@ -65,20 +85,14 @@ class Enforcer:
             remaining_tokens=snapshot.allocated_tokens - snapshot.consumed_tokens,
             burn_rate_tokens_per_min=snapshot.burn_rate_tokens_per_min,
         )
-        envelope = EventEnvelope(
-            type=EventType.BUDGET_THRESHOLD_ALERT,
-            payload=payload.model_dump(mode="json"),
-        )
-        await self._publisher.publish(envelope)
-
-        record = EnforcementRecord(
-            id=_prefixed_uuid("enf"),
+        await self._enforce(
             level=EnforcementLevel.ALERT,
             action_type="budget_alert",
+            event_type=EventType.BUDGET_THRESHOLD_ALERT,
+            payload=payload,
             details={"consumed_pct": snapshot.consumed_pct},
-            budget_consumed_pct=snapshot.consumed_pct,
+            consumed_pct=snapshot.consumed_pct,
         )
-        self._history.append(record)
         logger.warning(
             "budget alert enforced",
             consumed_pct=snapshot.consumed_pct,
@@ -93,34 +107,34 @@ class Enforcer:
             enforced_max_tier=ModelTier(self._config.restrict_max_tier),
             reason=f"Budget at {snapshot.consumed_pct}% — restricting to cheaper tiers",
         )
-        tier_envelope = EventEnvelope(
-            type=EventType.BUDGET_TIER_DOWNGRADE,
-            payload=tier_payload.model_dump(mode="json"),
+        await self._enforce(
+            level=EnforcementLevel.RESTRICT,
+            action_type="budget_tier_downgrade",
+            event_type=EventType.BUDGET_TIER_DOWNGRADE,
+            payload=tier_payload,
+            details={
+                "consumed_pct": snapshot.consumed_pct,
+                "enforced_max_tier": self._config.restrict_max_tier,
+            },
+            consumed_pct=snapshot.consumed_pct,
         )
-        await self._publisher.publish(tier_envelope)
 
         # Notify task graph to pause non-critical work.
         pause_payload = BudgetTaskPausedEvent(
             task_id=TaskId("*"),
             reason=f"Budget restriction at {snapshot.consumed_pct}%",
         )
-        pause_envelope = EventEnvelope(
-            type=EventType.BUDGET_TASK_PAUSED,
-            payload=pause_payload.model_dump(mode="json"),
-        )
-        await self._publisher.publish(pause_envelope)
-
-        record = EnforcementRecord(
-            id=_prefixed_uuid("enf"),
+        await self._enforce(
             level=EnforcementLevel.RESTRICT,
             action_type="budget_restrict",
+            event_type=EventType.BUDGET_TASK_PAUSED,
+            payload=pause_payload,
             details={
                 "consumed_pct": snapshot.consumed_pct,
                 "enforced_max_tier": self._config.restrict_max_tier,
             },
-            budget_consumed_pct=snapshot.consumed_pct,
+            consumed_pct=snapshot.consumed_pct,
         )
-        self._history.append(record)
         logger.warning(
             "budget restriction enforced",
             consumed_pct=snapshot.consumed_pct,
@@ -138,20 +152,14 @@ class Enforcer:
                 "enforcement_level": snapshot.enforcement_level.value,
             },
         )
-        halt_envelope = EventEnvelope(
-            type=EventType.BUDGET_HALT,
-            payload=halt_payload.model_dump(mode="json"),
-        )
-        await self._publisher.publish(halt_envelope)
-
-        record = EnforcementRecord(
-            id=_prefixed_uuid("enf"),
+        await self._enforce(
             level=EnforcementLevel.HALT,
             action_type="budget_halt",
+            event_type=EventType.BUDGET_HALT,
+            payload=halt_payload,
             details={"consumed_pct": snapshot.consumed_pct},
-            budget_consumed_pct=snapshot.consumed_pct,
+            consumed_pct=snapshot.consumed_pct,
         )
-        self._history.append(record)
         logger.error(
             "budget halt enforced — all work stopped",
             consumed_pct=snapshot.consumed_pct,
@@ -165,32 +173,49 @@ class Enforcer:
             retry_count=detection.retry_count,
             tokens_wasted=detection.tokens_since_last_diff,
         )
-        spin_envelope = EventEnvelope(
-            type=EventType.BUDGET_SPIN_DETECTED,
-            payload=spin_payload.model_dump(mode="json"),
-        )
-        await self._publisher.publish(spin_envelope)
-
-        record = EnforcementRecord(
-            id=_prefixed_uuid("enf"),
+        await self._enforce(
             level=EnforcementLevel.RESTRICT,
             action_type="spin_kill",
-            target_id=str(detection.agent_id),
+            event_type=EventType.BUDGET_SPIN_DETECTED,
+            payload=spin_payload,
             details={
                 "task_id": str(detection.task_id),
                 "retry_count": detection.retry_count,
                 "tokens_wasted": detection.tokens_since_last_diff,
             },
-            budget_consumed_pct=0.0,
-            timestamp=utcnow(),
+            consumed_pct=0.0,
+            target_id=str(detection.agent_id),
         )
-        self._history.append(record)
         logger.warning(
             "spinning agent killed",
             agent_id=str(detection.agent_id),
             task_id=str(detection.task_id),
             retries=detection.retry_count,
         )
+
+    # ── Persistence ──────────────────────────────────────────────────
+
+    async def _persist_action(self, record: EnforcementRecord) -> None:
+        """Write an :class:`EnforcementAction` row to Postgres.
+
+        Failures are logged but never propagated — the in-memory history
+        remains the authoritative fast path.
+        """
+        if self._session_factory is None:
+            return
+        try:
+            action = EnforcementAction(
+                enforcement_level=record.level,
+                action_type=record.action_type,
+                target_id=record.target_id,
+                details=record.details,
+                budget_consumed_pct=record.budget_consumed_pct,
+            )
+            async with self._session_factory() as session:
+                session.add(action)
+                await session.commit()
+        except Exception:
+            logger.warning("failed to persist enforcement action", exc_info=True)
 
     # ── Query ────────────────────────────────────────────────────────
 
