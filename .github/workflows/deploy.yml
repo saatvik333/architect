@@ -14,6 +14,10 @@ on:
         description: "Git ref to deploy (branch, tag, or SHA)"
         required: false
         default: "main"
+      rollback_ref:
+        description: "Git ref to rollback to (only used with rollback action)"
+        required: false
+        default: ""
 
 concurrency:
   group: deploy-${{ inputs.environment }}
@@ -45,7 +49,7 @@ jobs:
           ARCHITECT_PG_PASSWORD: ci_test_password
 
   deploy-staging:
-    if: inputs.environment == 'staging'
+    if: inputs.environment == 'staging' && inputs.rollback_ref == ''
     needs: validate
     runs-on: ubuntu-latest
     environment: staging
@@ -55,16 +59,56 @@ jobs:
           ref: ${{ inputs.ref || github.ref }}
 
       - name: Deploy to staging
+        env:
+          DEPLOY_HOST: ${{ secrets.STAGING_HOST }}
+          DEPLOY_USER: ${{ secrets.STAGING_USER }}
+          DEPLOY_KEY: ${{ secrets.STAGING_SSH_KEY }}
         run: |
-          echo "Deploying $(git rev-parse --short HEAD) to staging"
-          echo "TODO: Add actual deployment commands (docker compose, k8s apply, etc.)"
+          # Configure SSH
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # Pull latest images and restart
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "$DEPLOY_USER@$DEPLOY_HOST" << 'EOF'
+            cd /opt/architect
+            git pull origin main
+            docker compose --env-file .env -f infra/docker-compose.yml pull
+            docker compose --env-file .env -f infra/docker-compose.yml up -d
+
+            # Run migrations
+            uv run alembic upgrade head
+
+            # Wait for services to start
+            sleep 10
+          EOF
 
       - name: Smoke tests
+        env:
+          DEPLOY_HOST: ${{ secrets.STAGING_HOST }}
+          DEPLOY_USER: ${{ secrets.STAGING_USER }}
+          DEPLOY_KEY: ${{ secrets.STAGING_SSH_KEY }}
         run: |
-          echo "TODO: Run smoke tests against staging environment"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "$DEPLOY_USER@$DEPLOY_HOST" << 'EOF'
+            cd /opt/architect
+            python scripts/check-health.py --timeout 60
+          EOF
+
+      - name: Rollback on failure
+        if: failure()
+        env:
+          DEPLOY_HOST: ${{ secrets.STAGING_HOST }}
+          DEPLOY_USER: ${{ secrets.STAGING_USER }}
+          DEPLOY_KEY: ${{ secrets.STAGING_SSH_KEY }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "$DEPLOY_USER@$DEPLOY_HOST" << 'EOF'
+            cd /opt/architect
+            git checkout HEAD~1
+            docker compose --env-file .env -f infra/docker-compose.yml up -d
+          EOF
 
   deploy-production:
-    if: inputs.environment == 'production'
+    if: inputs.environment == 'production' && inputs.rollback_ref == ''
     needs: validate
     runs-on: ubuntu-latest
     environment:
@@ -76,10 +120,86 @@ jobs:
           ref: ${{ inputs.ref || github.ref }}
 
       - name: Deploy to production
+        env:
+          DEPLOY_HOST: ${{ secrets.PRODUCTION_HOST }}
+          DEPLOY_USER: ${{ secrets.PRODUCTION_USER }}
+          DEPLOY_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
         run: |
-          echo "Deploying $(git rev-parse --short HEAD) to production"
-          echo "TODO: Add actual deployment commands"
+          # Configure SSH
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # Pull latest images and restart
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "$DEPLOY_USER@$DEPLOY_HOST" << 'EOF'
+            cd /opt/architect
+            git fetch origin
+            git checkout ${{ inputs.ref || 'main' }}
+            docker compose --env-file .env -f infra/docker-compose.yml pull
+            docker compose --env-file .env -f infra/docker-compose.yml up -d
+
+            # Run migrations
+            uv run alembic upgrade head
+
+            # Wait for services to start
+            sleep 15
+          EOF
 
       - name: Post-deploy verification
+        env:
+          DEPLOY_HOST: ${{ secrets.PRODUCTION_HOST }}
+          DEPLOY_USER: ${{ secrets.PRODUCTION_USER }}
+          DEPLOY_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
         run: |
-          echo "TODO: Run health checks against production"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "$DEPLOY_USER@$DEPLOY_HOST" << 'EOF'
+            cd /opt/architect
+            python scripts/check-health.py --timeout 120
+          EOF
+
+      - name: Rollback on failure
+        if: failure()
+        env:
+          DEPLOY_HOST: ${{ secrets.PRODUCTION_HOST }}
+          DEPLOY_USER: ${{ secrets.PRODUCTION_USER }}
+          DEPLOY_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "$DEPLOY_USER@$DEPLOY_HOST" << 'EOF'
+            cd /opt/architect
+            git checkout HEAD~1
+            docker compose --env-file .env -f infra/docker-compose.yml up -d
+          EOF
+
+  rollback:
+    runs-on: ubuntu-latest
+    if: inputs.rollback_ref != ''
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Rollback to previous version
+        env:
+          DEPLOY_HOST: ${{ inputs.environment == 'production' && secrets.PRODUCTION_HOST || secrets.STAGING_HOST }}
+          DEPLOY_USER: ${{ inputs.environment == 'production' && secrets.PRODUCTION_USER || secrets.STAGING_USER }}
+          DEPLOY_KEY: ${{ inputs.environment == 'production' && secrets.PRODUCTION_SSH_KEY || secrets.STAGING_SSH_KEY }}
+          ROLLBACK_REF: ${{ inputs.rollback_ref }}
+        run: |
+          echo "Rolling back ${{ inputs.environment }} to: $ROLLBACK_REF"
+
+          # Configure SSH
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "$DEPLOY_USER@$DEPLOY_HOST" << EOF
+            cd /opt/architect
+            git fetch origin
+            git checkout $ROLLBACK_REF
+            docker compose --env-file .env -f infra/docker-compose.yml pull
+            docker compose --env-file .env -f infra/docker-compose.yml up -d
+
+            # Run migrations for the target version
+            uv run alembic upgrade head
+
+            # Verify services are healthy
+            python scripts/check-health.py --timeout 60
+          EOF
