@@ -176,6 +176,11 @@ uv run python -m multi_model_router.service        # Port 8011
 uv run python -m codebase_comprehension.service    # Port 8012
 uv run python -m agent_comm_bus.service            # Port 8013
 
+# Phase 3 services
+uv run uvicorn knowledge_memory.service:create_app --factory --host 127.0.0.1 --port 8014
+uv run uvicorn economic_governor.service:create_app --factory --host 127.0.0.1 --port 8015
+uv run uvicorn human_interface.service:create_app --factory --host 127.0.0.1 --port 8016
+
 # API Gateway
 uv run python -m api_gateway.service               # Port 8000
 ```
