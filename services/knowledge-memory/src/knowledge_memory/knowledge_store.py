@@ -240,10 +240,12 @@ class KnowledgeStore:
         *,
         domain: str | None = None,
         min_count: int = 5,
+        max_batch: int = 500,
     ) -> list[dict[str, Any]]:
         """Fetch uncompressed observations, optionally filtered by domain.
 
         Returns observations only when there are at least *min_count* available.
+        At most *max_batch* rows are returned to bound memory usage.
         """
         conditions = ["compressed = false"]
         params: dict[str, Any] = {}
@@ -252,8 +254,9 @@ class KnowledgeStore:
             conditions.append("domain = :domain")
             params["domain"] = domain
 
+        params["max_batch"] = max_batch
         where = " AND ".join(conditions)
-        query = f"SELECT * FROM observations WHERE {where} ORDER BY created_at"
+        query = f"SELECT * FROM observations WHERE {where} ORDER BY created_at LIMIT :max_batch"
 
         async with self._session_factory() as session:
             result = await session.execute(text(query), params)
