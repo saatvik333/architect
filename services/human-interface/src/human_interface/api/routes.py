@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hmac
+import os
 import time
 from datetime import timedelta
 from typing import Any
@@ -46,12 +48,20 @@ from human_interface.models import (
 )
 from human_interface.ws_manager import WebSocketManager
 
-from .dependencies import get_config, get_http_client, get_session_factory, get_ws_manager
+from .dependencies import (
+    get_config,
+    get_http_client,
+    get_session_factory,
+    get_temporal_client,
+    get_ws_manager,
+)
 
 logger = get_logger(component="human_interface.api.routes")
 
 router = APIRouter()
 
+# TODO: Move to app.state via lifespan handler so uptime reflects actual
+# server start rather than module-import time.
 _SERVICE_STARTED_AT = time.monotonic()
 
 
@@ -166,6 +176,24 @@ async def create_escalation(
         expires_at=expires_at,
     )
 
+    # Start timeout workflow if the escalation has an expiry.
+    if expires_at is not None:
+        try:
+            temporal_client = get_temporal_client()
+            timeout_secs = (expires_at - utcnow()).total_seconds()
+            if timeout_secs > 0:
+                await temporal_client.start_workflow(
+                    "EscalationTimeoutWorkflow",
+                    {"escalation_id": str(escalation_id), "timeout_seconds": timeout_secs},
+                    id=f"escalation-timeout-{escalation_id}",
+                    task_queue="human-interface",
+                )
+        except Exception:
+            logger.warning(
+                "failed to start escalation timeout workflow",
+                escalation_id=str(escalation_id),
+            )
+
     # Broadcast to WebSocket clients.
     await ws_manager.broadcast(
         WebSocketMessage(
@@ -188,22 +216,21 @@ async def list_escalations(
     session_factory: async_sessionmaker[AsyncSession] = Depends(get_session_factory),
 ) -> list[EscalationResponse]:
     """List escalations with optional filters."""
+    from sqlalchemy import select as sa_select
+
     async with session_factory() as session:
-        repo = EscalationRepository(session)
+        stmt = sa_select(Escalation).order_by(Escalation.created_at.desc())
         if status is not None:
-            rows = await repo.get_by_status(status.value, limit=limit, offset=offset)
-        else:
-            rows = await repo.list_all(limit=limit, offset=offset)
+            stmt = stmt.where(Escalation.status == status.value)
+        if category is not None:
+            stmt = stmt.where(Escalation.category == category.value)
+        if severity is not None:
+            stmt = stmt.where(Escalation.severity == severity.value)
+        stmt = stmt.limit(limit).offset(offset)
+        result = await session.execute(stmt)
+        rows = list(result.scalars().all())
 
-    results = [_escalation_to_response(r) for r in rows]
-
-    # Apply in-memory filters for category/severity if provided.
-    if category is not None:
-        results = [r for r in results if r.category == category]
-    if severity is not None:
-        results = [r for r in results if r.severity == severity]
-
-    return results
+    return [_escalation_to_response(r) for r in rows]
 
 
 @router.get("/api/v1/escalations/stats", response_model=EscalationStatsResponse)
@@ -250,6 +277,9 @@ async def resolve_escalation(
     session_factory: async_sessionmaker[AsyncSession] = Depends(get_session_factory),
 ) -> EscalationResponse:
     """Resolve an escalation with a human decision."""
+    # TODO(security): resolved_by should be derived from the authenticated user's
+    # identity, not accepted from the request body. Currently any caller can
+    # impersonate any identity. See review finding S-C5.
     async with session_factory() as session:
         repo = EscalationRepository(session)
         entity = await repo.resolve(
@@ -394,6 +424,11 @@ async def cast_vote(
         if gate.status != ApprovalGateStatus.PENDING.value:
             raise HTTPException(status_code=400, detail="Gate is no longer pending")
 
+        # Check for duplicate votes from same voter.
+        existing_votes = await vote_repo.get_by_gate(gate_id)
+        if any(v.voter == body.voter for v in existing_votes):
+            raise HTTPException(status_code=409, detail="Voter has already voted on this gate")
+
         # Record the vote.
         vote = ApprovalVote(
             gate_id=gate_id,
@@ -445,36 +480,37 @@ async def get_progress(
 
     Gracefully falls back to defaults if upstream services are unavailable.
     """
+    import asyncio
+
     import httpx as httpx_mod
 
-    http_client: httpx_mod.AsyncClient
+    fallback_client: httpx_mod.AsyncClient | None = None
     try:
         http_client = get_http_client()
     except RuntimeError:
-        http_client = httpx_mod.AsyncClient(timeout=5.0)
+        fallback_client = httpx_mod.AsyncClient(timeout=5.0)
+        http_client = fallback_client
 
-    tasks_completed = 0
-    tasks_total = 0
-    budget_consumed_pct = 0.0
-
-    # Fetch task graph stats.
     try:
-        resp = await http_client.get(f"{config.task_graph_url}/api/v1/tasks/stats")
-        if resp.status_code == 200:
-            data = resp.json()
-            tasks_completed = data.get("completed", 0)
-            tasks_total = data.get("total", 0)
-    except Exception:
-        logger.debug("task graph service unavailable for progress")
 
-    # Fetch budget snapshot.
-    try:
-        resp = await http_client.get(f"{config.economic_governor_url}/api/v1/budget/status")
-        if resp.status_code == 200:
-            data = resp.json()
-            budget_consumed_pct = data.get("consumed_pct", 0.0)
-    except Exception:
-        logger.debug("economic governor unavailable for progress")
+        async def _fetch_json(client: httpx_mod.AsyncClient, url: str, path: str) -> dict[str, Any]:
+            try:
+                resp = await client.get(f"{url}{path}", timeout=httpx_mod.Timeout(2.0))
+                return resp.json() if resp.status_code == 200 else {}
+            except Exception:
+                return {}
+
+        task_data, budget_data = await asyncio.gather(
+            _fetch_json(http_client, config.task_graph_url, "/api/v1/tasks/stats"),
+            _fetch_json(http_client, config.economic_governor_url, "/api/v1/budget/status"),
+        )
+
+        tasks_completed = task_data.get("completed", 0)
+        tasks_total = task_data.get("total", 0)
+        budget_consumed_pct = budget_data.get("consumed_pct", 0.0)
+    finally:
+        if fallback_client is not None:
+            await fallback_client.aclose()
 
     completion_pct = (tasks_completed / tasks_total * 100) if tasks_total > 0 else 0.0
 
@@ -507,13 +543,29 @@ async def websocket_endpoint(
     ws_manager: WebSocketManager = Depends(get_ws_manager),
 ) -> None:
     """Real-time WebSocket push to dashboard clients."""
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+
+    # Fail-closed: reject all connections when the token is not configured.
+    expected_token = os.environ.get("ARCHITECT_WS_TOKEN")
+    if not expected_token:
+        logger.error("ARCHITECT_WS_TOKEN env var is not set; rejecting WebSocket connection")
+        await websocket.close(code=4003, reason="WebSocket auth not configured")
+        return
+
+    if not hmac.compare_digest(token, expected_token):
+        await websocket.close(code=4001, reason="Invalid token")
+        return
+
     await ws_manager.connect(websocket)
     try:
         while True:
             # Keep the connection alive; clients may send pings or commands.
             await websocket.receive_text()
     except WebSocketDisconnect:
-        ws_manager.disconnect(websocket)
+        await ws_manager.disconnect(websocket)
 
 
 # ── Health ───────────────────────────────────────────────────────
@@ -522,7 +574,19 @@ async def websocket_endpoint(
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """Service health check endpoint."""
+    status = HealthStatus.HEALTHY
+
+    try:
+        get_session_factory()
+    except RuntimeError:
+        status = HealthStatus.DEGRADED
+
+    try:
+        get_ws_manager()
+    except RuntimeError:
+        status = HealthStatus.DEGRADED
+
     return HealthResponse(
-        status=HealthStatus.HEALTHY,
+        status=status,
         uptime_seconds=round(time.monotonic() - _SERVICE_STARTED_AT, 1),
     )
