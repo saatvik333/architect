@@ -101,6 +101,39 @@ class BudgetConfig(BaseSettings):
     hard_stop_threshold_pct: float = Field(default=95.0, ge=0.0, le=100.0)
 
 
+def validate_environment() -> list[str]:
+    """Check that all critical environment variables are set.
+
+    Returns a list of warning messages for any issues found.
+    Call at service startup to surface misconfigurations early.
+    """
+    import os
+
+    warnings: list[str] = []
+    required = {
+        "ARCHITECT_PG_PASSWORD": "Database password",
+    }
+    recommended = {
+        "ARCHITECT_GATEWAY_API_KEYS_RAW": "API Gateway authentication",
+        "ARCHITECT_WS_TOKEN": "WebSocket authentication",
+        "NATS_TOKEN": "NATS authentication",
+        "GRAFANA_PASSWORD": "Grafana admin password",
+    }
+
+    for var, desc in required.items():
+        if not os.environ.get(var):
+            warnings.append(f"CRITICAL: {var} not set ({desc})")
+
+    for var, desc in recommended.items():
+        val = os.environ.get(var, "")
+        if not val:
+            warnings.append(f"WARNING: {var} not set ({desc})")
+        elif val.startswith("changeme"):
+            warnings.append(f"WARNING: {var} appears to use a placeholder value ({desc})")
+
+    return warnings
+
+
 class ArchitectConfig(BaseSettings):
     """Root configuration aggregating all sub-configs."""
 

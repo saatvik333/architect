@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+import hmac
+import os
 import time
 from datetime import timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from architect_common.enums import (
@@ -17,6 +26,7 @@ from architect_common.enums import (
     EscalationStatus,
     HealthStatus,
 )
+from architect_common.health import HealthResponse
 from architect_common.logging import get_logger
 from architect_common.types import (
     ApprovalGateId,
@@ -46,24 +56,20 @@ from human_interface.models import (
 )
 from human_interface.ws_manager import WebSocketManager
 
-from .dependencies import get_config, get_http_client, get_session_factory, get_ws_manager
+from .dependencies import (
+    get_config,
+    get_http_client,
+    get_session_factory,
+    get_temporal_client,
+    get_ws_manager,
+)
 
 logger = get_logger(component="human_interface.api.routes")
 
 router = APIRouter()
 
-_SERVICE_STARTED_AT = time.monotonic()
-
 
 # ── Request / Response schemas ────────────────────────────────────
-
-
-class HealthResponse(BaseModel):
-    """Response body for GET /health."""
-
-    service: str = "human-interface"
-    status: HealthStatus
-    uptime_seconds: float = 0.0
 
 
 # ── Helpers ───────────────────────────────────────────────────────
@@ -166,6 +172,24 @@ async def create_escalation(
         expires_at=expires_at,
     )
 
+    # Start timeout workflow if the escalation has an expiry.
+    if expires_at is not None:
+        try:
+            temporal_client = get_temporal_client()
+            timeout_secs = (expires_at - utcnow()).total_seconds()
+            if timeout_secs > 0:
+                await temporal_client.start_workflow(
+                    "EscalationTimeoutWorkflow",
+                    {"escalation_id": str(escalation_id), "timeout_seconds": timeout_secs},
+                    id=f"escalation-timeout-{escalation_id}",
+                    task_queue="human-interface",
+                )
+        except Exception:
+            logger.warning(
+                "failed to start escalation timeout workflow",
+                escalation_id=str(escalation_id),
+            )
+
     # Broadcast to WebSocket clients.
     await ws_manager.broadcast(
         WebSocketMessage(
@@ -188,22 +212,21 @@ async def list_escalations(
     session_factory: async_sessionmaker[AsyncSession] = Depends(get_session_factory),
 ) -> list[EscalationResponse]:
     """List escalations with optional filters."""
+    from sqlalchemy import select as sa_select
+
     async with session_factory() as session:
-        repo = EscalationRepository(session)
+        stmt = sa_select(Escalation).order_by(Escalation.created_at.desc())
         if status is not None:
-            rows = await repo.get_by_status(status.value, limit=limit, offset=offset)
-        else:
-            rows = await repo.list_all(limit=limit, offset=offset)
+            stmt = stmt.where(Escalation.status == status.value)
+        if category is not None:
+            stmt = stmt.where(Escalation.category == category.value)
+        if severity is not None:
+            stmt = stmt.where(Escalation.severity == severity.value)
+        stmt = stmt.limit(limit).offset(offset)
+        result = await session.execute(stmt)
+        rows = list(result.scalars().all())
 
-    results = [_escalation_to_response(r) for r in rows]
-
-    # Apply in-memory filters for category/severity if provided.
-    if category is not None:
-        results = [r for r in results if r.category == category]
-    if severity is not None:
-        results = [r for r in results if r.severity == severity]
-
-    return results
+    return [_escalation_to_response(r) for r in rows]
 
 
 @router.get("/api/v1/escalations/stats", response_model=EscalationStatsResponse)
@@ -246,15 +269,24 @@ async def get_escalation(
 async def resolve_escalation(
     escalation_id: str,
     body: ResolveEscalationRequest,
+    request: Request,
     ws_manager: WebSocketManager = Depends(get_ws_manager),
     session_factory: async_sessionmaker[AsyncSession] = Depends(get_session_factory),
 ) -> EscalationResponse:
     """Resolve an escalation with a human decision."""
+    # Prefer identity from authenticated header; fall back to body field.
+    resolved_by = request.headers.get("X-Authenticated-User") or body.resolved_by
+    if not resolved_by:
+        raise HTTPException(
+            status_code=401,
+            detail="Identity required: provide X-Authenticated-User header or resolved_by field",
+        )
+
     async with session_factory() as session:
         repo = EscalationRepository(session)
         entity = await repo.resolve(
             escalation_id,
-            resolved_by=body.resolved_by,
+            resolved_by=resolved_by,
             resolution=body.resolution,
             resolution_details=body.custom_input,
         )
@@ -347,16 +379,11 @@ async def list_approval_gates(
     async with session_factory() as session:
         repo = ApprovalGateRepository(session)
         if status == ApprovalGateStatus.PENDING:
-            rows = await repo.get_pending(limit=limit)
+            rows = await repo.get_pending(limit=limit, action_type=action_type)
         else:
-            rows = await repo.list_all(limit=limit, offset=offset)
+            rows = await repo.list_all(limit=limit, offset=offset, action_type=action_type)
 
-    results = [_gate_to_response(r) for r in rows]
-
-    if action_type is not None:
-        results = [r for r in results if r.action_type == action_type]
-
-    return results
+    return [_gate_to_response(r) for r in rows]
 
 
 @router.get("/api/v1/approval-gates/{gate_id}", response_model=ApprovalGateResponse)
@@ -379,10 +406,19 @@ async def get_approval_gate(
 async def cast_vote(
     gate_id: str,
     body: VoteRequest,
+    request: Request,
     ws_manager: WebSocketManager = Depends(get_ws_manager),
     session_factory: async_sessionmaker[AsyncSession] = Depends(get_session_factory),
 ) -> ApprovalGateResponse:
     """Cast a vote on an approval gate. Auto-resolves if enough votes."""
+    # Prefer identity from authenticated header; fall back to body field.
+    voter = request.headers.get("X-Authenticated-User") or body.voter
+    if not voter:
+        raise HTTPException(
+            status_code=401,
+            detail="Identity required: provide X-Authenticated-User header or voter field",
+        )
+
     async with session_factory() as session:
         gate_repo = ApprovalGateRepository(session)
         vote_repo = ApprovalVoteRepository(session)
@@ -394,10 +430,15 @@ async def cast_vote(
         if gate.status != ApprovalGateStatus.PENDING.value:
             raise HTTPException(status_code=400, detail="Gate is no longer pending")
 
+        # Check for duplicate votes from same voter.
+        existing_votes = await vote_repo.get_by_gate(gate_id)
+        if any(v.voter == voter for v in existing_votes):
+            raise HTTPException(status_code=409, detail="Voter has already voted on this gate")
+
         # Record the vote.
         vote = ApprovalVote(
             gate_id=gate_id,
-            voter=body.voter,
+            voter=voter,
             decision=body.decision,
             comment=body.comment,
         )
@@ -428,7 +469,7 @@ async def cast_vote(
     logger.info(
         "vote cast on approval gate",
         gate_id=gate_id,
-        voter=body.voter,
+        voter=voter,
         decision=body.decision,
     )
     return result
@@ -445,36 +486,37 @@ async def get_progress(
 
     Gracefully falls back to defaults if upstream services are unavailable.
     """
+    import asyncio
+
     import httpx as httpx_mod
 
-    http_client: httpx_mod.AsyncClient
+    fallback_client: httpx_mod.AsyncClient | None = None
     try:
         http_client = get_http_client()
     except RuntimeError:
-        http_client = httpx_mod.AsyncClient(timeout=5.0)
+        fallback_client = httpx_mod.AsyncClient(timeout=5.0)
+        http_client = fallback_client
 
-    tasks_completed = 0
-    tasks_total = 0
-    budget_consumed_pct = 0.0
-
-    # Fetch task graph stats.
     try:
-        resp = await http_client.get(f"{config.task_graph_url}/api/v1/tasks/stats")
-        if resp.status_code == 200:
-            data = resp.json()
-            tasks_completed = data.get("completed", 0)
-            tasks_total = data.get("total", 0)
-    except Exception:
-        logger.debug("task graph service unavailable for progress")
 
-    # Fetch budget snapshot.
-    try:
-        resp = await http_client.get(f"{config.economic_governor_url}/api/v1/budget/status")
-        if resp.status_code == 200:
-            data = resp.json()
-            budget_consumed_pct = data.get("consumed_pct", 0.0)
-    except Exception:
-        logger.debug("economic governor unavailable for progress")
+        async def _fetch_json(client: httpx_mod.AsyncClient, url: str, path: str) -> dict[str, Any]:
+            try:
+                resp = await client.get(f"{url}{path}", timeout=httpx_mod.Timeout(2.0))
+                return resp.json() if resp.status_code == 200 else {}
+            except Exception:
+                return {}
+
+        task_data, budget_data = await asyncio.gather(
+            _fetch_json(http_client, config.task_graph_url, "/api/v1/tasks/stats"),
+            _fetch_json(http_client, config.economic_governor_url, "/api/v1/budget/status"),
+        )
+
+        tasks_completed = task_data.get("completed", 0)
+        tasks_total = task_data.get("total", 0)
+        budget_consumed_pct = budget_data.get("consumed_pct", 0.0)
+    finally:
+        if fallback_client is not None:
+            await fallback_client.aclose()
 
     completion_pct = (tasks_completed / tasks_total * 100) if tasks_total > 0 else 0.0
 
@@ -507,22 +549,52 @@ async def websocket_endpoint(
     ws_manager: WebSocketManager = Depends(get_ws_manager),
 ) -> None:
     """Real-time WebSocket push to dashboard clients."""
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+
+    # Fail-closed: reject all connections when the token is not configured.
+    expected_token = os.environ.get("ARCHITECT_WS_TOKEN")
+    if not expected_token:
+        logger.error("ARCHITECT_WS_TOKEN env var is not set; rejecting WebSocket connection")
+        await websocket.close(code=4003, reason="WebSocket auth not configured")
+        return
+
+    if not hmac.compare_digest(token, expected_token):
+        await websocket.close(code=4001, reason="Invalid token")
+        return
+
     await ws_manager.connect(websocket)
     try:
         while True:
             # Keep the connection alive; clients may send pings or commands.
             await websocket.receive_text()
     except WebSocketDisconnect:
-        ws_manager.disconnect(websocket)
+        await ws_manager.disconnect(websocket)
 
 
 # ── Health ───────────────────────────────────────────────────────
 
 
 @router.get("/health", response_model=HealthResponse)
-async def health_check() -> HealthResponse:
+async def health_check(request: Request) -> HealthResponse:
     """Service health check endpoint."""
+    status = HealthStatus.HEALTHY
+
+    try:
+        get_session_factory()
+    except RuntimeError:
+        status = HealthStatus.DEGRADED
+
+    try:
+        get_ws_manager()
+    except RuntimeError:
+        status = HealthStatus.DEGRADED
+
+    uptime = time.monotonic() - getattr(request.app.state, "started_at", time.monotonic())
     return HealthResponse(
-        status=HealthStatus.HEALTHY,
-        uptime_seconds=round(time.monotonic() - _SERVICE_STARTED_AT, 1),
+        service="human-interface",
+        status=status,
+        uptime_seconds=round(uptime, 2),
     )

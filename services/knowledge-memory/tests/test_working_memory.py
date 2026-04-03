@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import asyncio
+from datetime import timedelta
+from unittest.mock import patch
 
-from architect_common.types import AgentId, KnowledgeId, TaskId
+from architect_common.types import AgentId, KnowledgeId, TaskId, utcnow
 from knowledge_memory.working_memory import WorkingMemoryStore
 
 
@@ -92,16 +93,17 @@ class TestWorkingMemoryStore:
 
     async def test_evict_expired(self) -> None:
         """evict_expired() should remove entries past the TTL."""
-        store = WorkingMemoryStore(ttl_seconds=1, max_entries=100)
+        store = WorkingMemoryStore(ttl_seconds=60, max_entries=100)
         task_id = TaskId("task-evict001")
         agent_id = AgentId("agent-evict001")
 
         await store.create(task_id, agent_id)
         assert store.size == 1
 
-        # Wait for expiry
-        await asyncio.sleep(1.5)
-        evicted = await store.evict_expired()
+        # Advance time past TTL without actually sleeping
+        future_time = utcnow() + timedelta(seconds=61)
+        with patch("knowledge_memory.working_memory.utcnow", return_value=future_time):
+            evicted = await store.evict_expired()
         assert evicted == 1
         assert store.size == 0
 

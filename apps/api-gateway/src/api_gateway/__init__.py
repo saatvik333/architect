@@ -16,8 +16,10 @@ import structlog
 from fastapi import Depends, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.datastructures import MutableHeaders
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from api_gateway.config import GatewayConfig
 from api_gateway.models import (
@@ -87,36 +89,62 @@ app = FastAPI(
 # ── Middleware classes ─────────────────────────────────────────────
 
 
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Add standard security headers to every response."""
+class SecurityHeadersMiddleware:
+    """Add standard security headers to every HTTP response (pure ASGI)."""
 
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        response = await call_next(request)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=()"
-        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
-        # HSTS only in non-dev environments
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
         config = get_config()
-        if config.environment != "dev":
-            response.headers["Strict-Transport-Security"] = "max-age=31536000"
-        return response
+
+        async def send_wrapper(message: dict[str, Any]) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers.append("X-Content-Type-Options", "nosniff")
+                headers.append("X-Frame-Options", "DENY")
+                headers.append("Referrer-Policy", "strict-origin-when-cross-origin")
+                headers.append("Permissions-Policy", "camera=(), microphone=()")
+                headers.append(
+                    "Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"
+                )
+                if config.environment != "dev":
+                    headers.append("Strict-Transport-Security", "max-age=31536000")
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
 
 
-class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
-    """Reject requests whose ``Content-Length`` exceeds the configured limit."""
+class RequestSizeLimitMiddleware:
+    """Reject requests whose ``Content-Length`` exceeds the configured limit (pure ASGI)."""
 
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
         config = get_config()
         max_bytes = config.max_request_body_bytes
-        content_length = request.headers.get("content-length")
-        if content_length is not None and int(content_length) > max_bytes:
-            return JSONResponse(
+
+        # Extract Content-Length from raw ASGI headers.
+        headers = dict(scope.get("headers", []))
+        content_length_raw = headers.get(b"content-length")
+        if content_length_raw is not None and int(content_length_raw) > max_bytes:
+            response = JSONResponse(
                 status_code=413,
                 content={"detail": f"Request body too large (max {max_bytes} bytes)"},
             )
-        return await call_next(request)
+            await response(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -190,8 +218,17 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
 
         api_keys = config.api_keys
 
-        # No keys configured = open access (development only)
+        # No keys configured — fail closed in non-dev environments
         if not api_keys:
+            if config.environment not in ("dev", "test", "development"):
+                logger.error("auth_no_keys", msg="Auth enabled but no API keys configured")
+                return JSONResponse(
+                    status_code=503,
+                    content={"detail": "Service misconfigured: auth enabled with no keys"},
+                )
+            logger.warning(
+                "auth_open_access", msg="No API keys configured — open access (dev only)"
+            )
             return await call_next(request)
 
         # Extract Bearer token

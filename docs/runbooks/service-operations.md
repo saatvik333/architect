@@ -34,6 +34,11 @@ curl http://localhost:8011/health  # Multi-Model Router
 curl http://localhost:8012/health  # Codebase Comprehension
 curl http://localhost:8013/health  # Agent Comm Bus
 
+# Phase 3 services
+curl http://localhost:8014/health  # Knowledge & Memory
+curl http://localhost:8015/health  # Economic Governor
+curl http://localhost:8016/health  # Human Interface
+
 # Gateway (aggregates all above)
 curl http://localhost:8000/health  # API Gateway
 ```
@@ -135,6 +140,50 @@ GROUP BY type
 ORDER BY count DESC;
 ```
 
+**Pending escalations (Phase 3):**
+
+```sql
+SELECT id, summary, severity, category, created_at
+FROM escalations
+WHERE status = 'pending'
+ORDER BY created_at;
+```
+
+**Budget consumption status (Phase 3):**
+
+```sql
+SELECT id, consumed_tokens, consumed_usd, enforcement_level, created_at
+FROM budget_records
+ORDER BY created_at DESC
+LIMIT 1;
+```
+
+**Active heuristic rules (Phase 3):**
+
+```sql
+SELECT id, domain, condition, action, confidence
+FROM heuristic_rules
+WHERE active = true
+ORDER BY confidence DESC;
+```
+
+**Knowledge entries by layer (Phase 3):**
+
+```sql
+SELECT layer, COUNT(*) as count
+FROM knowledge_entries
+WHERE active = true
+GROUP BY layer;
+```
+
+**Expired approval gates (Phase 3):**
+
+```sql
+SELECT id, summary, status, expires_at
+FROM approval_gates
+WHERE status = 'pending' AND expires_at < NOW();
+```
+
 ---
 
 ## Redis Operations
@@ -212,6 +261,50 @@ docker compose -f infra/docker-compose.yml restart redis
 
 ```bash
 docker stats $(docker compose -f infra/docker-compose.yml ps -q)
+```
+
+---
+
+## Budget Exhaustion
+
+### Check Current Budget State
+
+```bash
+curl http://localhost:8015/api/v1/budget/status
+```
+
+### Check Enforcement Level
+
+```bash
+curl http://localhost:8015/api/v1/enforcement/current-level
+```
+
+### Check Enforcement History
+
+```bash
+curl http://localhost:8015/api/v1/enforcement/history
+```
+
+### Increasing the Budget
+
+1. Update `ARCHITECT_BUDGET_TOTAL_TOKENS` in `.env` (or the deployment environment variables)
+2. Restart the Economic Governor service — it will reload the new budget limit and restore persisted consumption state from Postgres
+
+### Investigating What Consumed the Budget
+
+Check the efficiency leaderboard to see per-agent token consumption and efficiency scores:
+
+```bash
+curl http://localhost:8015/api/v1/efficiency/leaderboard
+```
+
+Cross-reference with budget records in the database:
+
+```sql
+SELECT id, consumed_tokens, consumed_usd, enforcement_level, created_at
+FROM budget_records
+ORDER BY created_at DESC
+LIMIT 10;
 ```
 
 ---

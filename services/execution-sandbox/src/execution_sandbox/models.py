@@ -107,6 +107,10 @@ class SandboxSession(MutableBase):
     spec: SandboxSpec
     status: SandboxStatus = SandboxStatus.CREATING
     container_id: str | None = None
+    executor_type: str = Field(
+        default="docker",
+        description="Backend that created this session: 'docker' or 'firecracker'.",
+    )
     timestamps: SessionTimestamps = Field(default_factory=SessionTimestamps)
     audit_log: list[AuditLogEntry] = Field(default_factory=list)
     exit_code: int | None = None

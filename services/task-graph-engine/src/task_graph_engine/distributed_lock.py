@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any, cast
@@ -41,19 +42,22 @@ class DistributedSchedulerLock:
             self._redis = None
 
     @asynccontextmanager
-    async def schedule_lock(self) -> AsyncIterator[None]:
-        """Acquire a distributed scheduling lock."""
+    async def schedule_lock(self, *, timeout: float = 5.0) -> AsyncIterator[None]:
+        """Acquire a distributed scheduling lock.
+
+        Retries every 100ms until *timeout* seconds have elapsed.
+        """
         if self._redis is not None:
-            # Simple Redis SETNX-based lock with TTL
+            deadline = time.monotonic() + timeout
             lock_acquired = False
             try:
-                lock_acquired = await self._redis.set(_LOCK_KEY, "1", nx=True, ex=30)
-                if not lock_acquired:
-                    # Wait briefly and retry once
-                    await asyncio.sleep(0.1)
+                while time.monotonic() < deadline:
                     lock_acquired = await self._redis.set(_LOCK_KEY, "1", nx=True, ex=30)
+                    if lock_acquired:
+                        break
+                    await asyncio.sleep(0.1)
                 if not lock_acquired:
-                    raise RuntimeError("Could not acquire scheduler lock")
+                    raise RuntimeError(f"Could not acquire scheduler lock after {timeout}s")
                 yield
             finally:
                 if lock_acquired:

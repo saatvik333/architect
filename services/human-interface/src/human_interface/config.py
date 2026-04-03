@@ -29,6 +29,13 @@ class HumanInterfaceConfig(BaseSettings):
     nats_url: str = "nats://localhost:4222"
     ws_heartbeat_interval_seconds: int = Field(default=30, ge=1)
 
+    # ── Authentication ──────────────────────────────────────────────
+    ws_token: str | None = Field(
+        default=None,
+        description="Expected token for WebSocket authentication (env: ARCHITECT_WS_TOKEN).",
+        alias="ARCHITECT_WS_TOKEN",
+    )
+
     # ── Service URLs ─────────────────────────────────────────────────
     wsl_url: str = "http://localhost:8001"
     economic_governor_url: str = "http://localhost:8015"

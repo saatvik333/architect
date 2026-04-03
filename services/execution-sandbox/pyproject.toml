@@ -9,6 +9,7 @@ dependencies = [
     "architect-observability",
     "docker>=7.0",
     "fastapi>=0.115",
+    "httpx>=0.27",
     "uvicorn>=0.32",
 ]
 

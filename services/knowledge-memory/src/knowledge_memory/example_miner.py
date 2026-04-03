@@ -6,8 +6,6 @@ or usage patterns relevant to a given topic.
 
 from __future__ import annotations
 
-import json
-
 import httpx
 
 from architect_common.enums import ContentType, MemoryLayer
@@ -16,6 +14,7 @@ from architect_common.types import new_knowledge_id
 from architect_llm.client import LLMClient
 from architect_llm.models import LLMRequest
 from knowledge_memory.doc_fetcher import fetch_documentation
+from knowledge_memory.llm_utils import parse_llm_json_array
 from knowledge_memory.models import KnowledgeEntry
 
 logger = get_logger(component="knowledge_memory.example_miner")
@@ -46,30 +45,25 @@ async def mine_examples(
     source_content = ""
 
     if source_urls:
-        # Reuse a single HTTP client across all URL fetches to avoid
-        # creating/destroying a connection pool per URL.
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as http_client:
-            for url in source_urls:
-                try:
-                    doc_text = await fetch_documentation(
-                        url, max_size_kb=max_doc_size_kb, client=http_client
-                    )
-                    source_content += f"\n\n--- Source: {url} ---\n{doc_text[:5000]}"
-                except Exception:
-                    logger.warning("failed to fetch source URL", url=url)
-                    continue
+        for url in source_urls:
+            try:
+                doc_text = await fetch_documentation(url, max_size_kb=max_doc_size_kb)
+                source_content += f"\n\n--- Source: {url} ---\n{doc_text[:5000]}"
+            except (httpx.HTTPError, ValueError, ConnectionError) as exc:
+                logger.warning("failed_to_fetch_source_url", url=url, error=str(exc))
+                continue
 
     if source_content:
         prompt_content = (
-            f"Topic: {topic}\n\n"
-            f"Source documentation:\n{source_content}\n\n"
+            f"Topic: <user_input>{topic}</user_input>\n\n"
+            f"Source documentation:\n<user_input>{source_content}</user_input>\n\n"
             "Extract concrete code examples and usage patterns from the documentation above. "
             "Return a JSON array of example objects with keys: "
             '"title", "content" (the example code/text), "tags" (string array).'
         )
     else:
         prompt_content = (
-            f"Topic: {topic}\n\n"
+            f"Topic: <user_input>{topic}</user_input>\n\n"
             "Provide concrete code examples and usage patterns for this topic. "
             "Return a JSON array of example objects with keys: "
             '"title", "content" (the example code/text), "tags" (string array).'
@@ -89,25 +83,10 @@ async def mine_examples(
     response = await llm_client.generate(request)
 
     examples: list[KnowledgeEntry] = []
-    try:
-        raw_examples = json.loads(response.content)
-        if not isinstance(raw_examples, list):
-            raw_examples = [raw_examples]
+    raw_examples = parse_llm_json_array(response.content, logger)
 
-        for re_ in raw_examples:
-            entry = KnowledgeEntry(
-                id=new_knowledge_id(),
-                layer=MemoryLayer.L1_PROJECT,
-                topic=topic,
-                title=re_.get("title", f"Example: {topic}"),
-                content=re_.get("content", ""),
-                content_type=ContentType.EXAMPLE,
-                tags=re_.get("tags", [topic]),
-                source="example_mine",
-            )
-            examples.append(entry)
-    except (json.JSONDecodeError, TypeError):
-        logger.warning("failed to parse LLM example response, using raw content")
+    if not raw_examples:
+        # Fallback: preserve the raw LLM content as a single entry
         examples.append(
             KnowledgeEntry(
                 id=new_knowledge_id(),
@@ -120,6 +99,19 @@ async def mine_examples(
                 source="example_mine:parse_fallback",
             )
         )
+    else:
+        for raw_example in raw_examples:
+            entry = KnowledgeEntry(
+                id=new_knowledge_id(),
+                layer=MemoryLayer.L1_PROJECT,
+                topic=topic,
+                title=raw_example.get("title", f"Example: {topic}"),
+                content=raw_example.get("content", ""),
+                content_type=ContentType.EXAMPLE,
+                tags=raw_example.get("tags", [topic]),
+                source="example_mine",
+            )
+            examples.append(entry)
 
     logger.info("mined examples", topic=topic, count=len(examples))
     return examples

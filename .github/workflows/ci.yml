@@ -55,7 +55,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
       - run: uv sync --all-packages --group dev --locked
-      - run: uv run pytest libs/ services/ apps/ -x -q --tb=short --cov=libs --cov=services --cov=apps --cov-report=xml --cov-fail-under=60
+      - run: uv run pytest libs/ services/ apps/ -x -q --tb=short --cov=libs --cov=services --cov=apps --cov-report=xml --cov-fail-under=75
         env:
           ARCHITECT_PG_PASSWORD: ci_test_password
       - name: Upload coverage to Codecov
@@ -95,7 +95,7 @@ jobs:
     needs: [lint, typecheck, test, security]
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: architect
           POSTGRES_PASSWORD: ci_test_password
@@ -105,9 +105,17 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
       redis:
         image: redis:7
+        # CI Redis runs without auth intentionally — service containers are
+        # isolated to the runner and not reachable externally. Production and
+        # local-dev Redis require ARCHITECT_REDIS_PASSWORD (set by dev-setup.sh).
         ports:
           - 6379:6379
         options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+    # TODO: Add Temporal and NATS service containers when integration tests
+    # require them. Currently skipped because:
+    # - Temporal requires its own Postgres DB and complex auto-setup
+    # - NATS requires token auth matching the application config
+    # Integration tests that need these services use pytest.skip()
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7

@@ -1,1 +1,1 @@
-"""ARCHITECT Deployment Pipeline — automated build, test, and deploy orchestration. Phase 4 implementation."""
+"""ARCHITECT Deployment Pipeline — automated canary deployment with progressive rollout, health monitoring, and rollback."""

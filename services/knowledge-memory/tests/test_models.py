@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from knowledge_memory.models import (
     AcquireKnowledgeRequest,
     CompressionRequest,
@@ -45,11 +48,8 @@ class TestKnowledgeEntry:
             content="Cannot mutate",
             content_type="pattern",
         )
-        try:
+        with pytest.raises(ValidationError):
             entry.title = "Should fail"  # type: ignore[misc]
-            raise AssertionError("Should have raised")
-        except Exception:
-            pass  # Expected: frozen model
 
     def test_with_embedding(self) -> None:
         entry = KnowledgeEntry(

@@ -9,7 +9,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from architect_common.enums import EventType
 from architect_common.logging import get_logger, setup_logging
+from architect_events.subscriber import EventSubscriber
 from architect_observability import init_observability, shutdown_observability
 from knowledge_memory.api.dependencies import (
     cleanup,
@@ -19,6 +21,7 @@ from knowledge_memory.api.dependencies import (
     set_working_memory,
 )
 from knowledge_memory.api.routes import router
+from knowledge_memory.event_handler import KnowledgeEventHandler
 from knowledge_memory.heuristic_engine import HeuristicEngine
 from knowledge_memory.knowledge_store import KnowledgeStore
 from knowledge_memory.working_memory import WorkingMemoryStore
@@ -29,6 +32,9 @@ logger = get_logger(component="knowledge_memory.service")
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Manage startup and shutdown lifecycle for the Knowledge & Memory service."""
+    import time
+
+    app.state.started_at = time.monotonic()
     config = get_config()
     setup_logging(log_level=config.log_level)
 
@@ -42,6 +48,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Initialize knowledge store (requires DB connection)
     # In production, this creates a real DB engine + session factory.
     # For initial startup without DB, we create a placeholder.
+    store = None
     try:
         from architect_db.engine import create_engine, create_session_factory
 
@@ -64,12 +71,35 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Initialize heuristic engine
     try:
-        he = HeuristicEngine(
-            knowledge_store=store,
-        )
-        set_heuristic_engine(he)
+        if store is not None:
+            he = HeuristicEngine(
+                knowledge_store=store,
+            )
+            set_heuristic_engine(he)
     except Exception:
         logger.warning("heuristic engine not initialized (no knowledge store)")
+
+    # ── Event subscriptions ──────────────────────────────────────────
+    subscriber: EventSubscriber | None = None
+    if store is not None:
+        try:
+            event_handler = KnowledgeEventHandler(store)
+            subscriber = EventSubscriber(
+                redis_url=config.architect.redis.url,
+                group="knowledge-memory",
+                consumer="km-1",
+            )
+            subscriber.on(EventType.TASK_COMPLETED, event_handler.handle_task_completed)
+            subscriber.on(EventType.TASK_FAILED, event_handler.handle_task_failed)
+
+            await subscriber.start([EventType.TASK_COMPLETED, EventType.TASK_FAILED])
+            logger.info("event subscriber started")
+        except Exception:
+            logger.warning(
+                "event subscriber failed to start — running without it",
+                exc_info=True,
+            )
+            subscriber = None
 
     # Start background task for working memory eviction
     eviction_task = asyncio.create_task(_eviction_loop(wm_store))
@@ -82,6 +112,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     eviction_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await eviction_task
+
+    if subscriber is not None:
+        await subscriber.stop()
 
     shutdown_observability(app)
     await cleanup()

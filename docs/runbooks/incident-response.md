@@ -20,7 +20,7 @@
 
 ```bash
 # Check all services at once
-for port in 8000 8001 8003 8007 8008 8009 8010 8011 8012 8013; do
+for port in 8000 8001 8003 8007 8008 8009 8010 8011 8012 8013 8014 8015 8016; do
     echo -n "Port $port: "
     curl -sf http://localhost:$port/health | jq -r '.status' 2>/dev/null || echo "DOWN"
 done

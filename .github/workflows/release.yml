@@ -47,7 +47,29 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push service image
+      - name: Build service image (local only)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: infra/dockerfiles/Dockerfile.service
+          push: false
+          load: true
+          tags: |
+            ghcr.io/${{ github.repository }}/service:${{ steps.changelog.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Pinned to v0.28.0 — review for updates periodically
+      - name: Scan container image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}/service:${{ steps.changelog.outputs.version }}
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      - name: Push service image
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -55,6 +77,8 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}/service:${{ steps.changelog.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from architect_common.enums import HealthStatus, SandboxStatus
 from architect_common.errors import SandboxError, SandboxSecurityError, SandboxTimeoutError
-from execution_sandbox.docker_executor import DockerExecutor
+from execution_sandbox.executor_base import ExecutorBase
 from execution_sandbox.models import SandboxSpec
 
 from .dependencies import get_executor
@@ -69,7 +69,7 @@ class ReadFilesResponse(BaseModel):
 
 # ── Helper ───────────────────────────────────────────────────────────
 
-ExecutorDep = Annotated[DockerExecutor, Depends(get_executor)]
+ExecutorDep = Annotated[ExecutorBase, Depends(get_executor)]
 
 
 def _to_sandbox_response(session: Any) -> SandboxResponse:

@@ -82,18 +82,19 @@ class EscalationRepository(BaseRepository[Escalation]):
         return list(result.scalars().all())
 
     async def get_stats(self) -> dict[str, int]:
-        total_stmt = select(func.count()).select_from(Escalation)
-        pending_stmt = (
-            select(func.count()).select_from(Escalation).where(Escalation.status == "pending")
-        )
-        resolved_stmt = (
-            select(func.count()).select_from(Escalation).where(Escalation.status == "resolved")
-        )
+        from sqlalchemy import case
 
-        total = (await self._session.execute(total_stmt)).scalar() or 0
-        pending = (await self._session.execute(pending_stmt)).scalar() or 0
-        resolved = (await self._session.execute(resolved_stmt)).scalar() or 0
+        stmt = select(
+            func.count().label("total"),
+            func.count(case((Escalation.status == "pending", 1))).label("pending"),
+            func.count(case((Escalation.status == "resolved", 1))).label("resolved"),
+        ).select_from(Escalation)
 
+        result = await self._session.execute(stmt)
+        row = result.one()
+        total = row.total or 0
+        pending = row.pending or 0
+        resolved = row.resolved or 0
         return {
             "total": total,
             "pending": pending,
@@ -107,13 +108,31 @@ class ApprovalGateRepository(BaseRepository[ApprovalGate]):
 
     model_class = ApprovalGate
 
-    async def get_pending(self, *, limit: int = 100) -> list[ApprovalGate]:
+    async def get_pending(
+        self, *, limit: int = 100, action_type: str | None = None
+    ) -> list[ApprovalGate]:
         stmt = (
             select(ApprovalGate)
             .where(ApprovalGate.status == "pending")
             .order_by(ApprovalGate.created_at.desc())
             .limit(limit)
         )
+        if action_type is not None:
+            stmt = stmt.where(ApprovalGate.action_type == action_type)
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def list_all(
+        self, *, limit: int = 100, offset: int = 0, action_type: str | None = None
+    ) -> list[ApprovalGate]:
+        stmt = (
+            select(ApprovalGate)
+            .order_by(ApprovalGate.created_at.desc())
+            .limit(min(limit, 1000))
+            .offset(offset)
+        )
+        if action_type is not None:
+            stmt = stmt.where(ApprovalGate.action_type == action_type)
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 

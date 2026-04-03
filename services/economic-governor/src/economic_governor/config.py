@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from architect_common.config import ArchitectConfig
@@ -49,6 +49,34 @@ class EconomicGovernorConfig(BaseSettings):
     review_budget_pct: float = Field(default=5.0, ge=0.0, le=100.0)
     debugging_budget_pct: float = Field(default=15.0, ge=0.0, le=100.0)
     contingency_budget_pct: float = Field(default=5.0, ge=0.0, le=100.0)
+
+    @model_validator(mode="after")
+    def _check_threshold_ordering(self) -> EconomicGovernorConfig:
+        if not (self.alert_threshold_pct <= self.restrict_threshold_pct <= self.halt_threshold_pct):
+            msg = (
+                f"Budget thresholds must satisfy alert <= restrict <= halt, "
+                f"got alert={self.alert_threshold_pct}, "
+                f"restrict={self.restrict_threshold_pct}, "
+                f"halt={self.halt_threshold_pct}"
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def _check_phase_budgets_sum_to_100(self) -> EconomicGovernorConfig:
+        total = (
+            self.spec_budget_pct
+            + self.planning_budget_pct
+            + self.implementation_budget_pct
+            + self.testing_budget_pct
+            + self.review_budget_pct
+            + self.debugging_budget_pct
+            + self.contingency_budget_pct
+        )
+        if abs(total - 100.0) > 0.01:
+            msg = f"Phase budget percentages must sum to 100.0 (±0.01), got {total}"
+            raise ValueError(msg)
+        return self
 
     # ── Spin detection ───────────────────────────────────────────────
     spin_max_retries: int = Field(default=3, ge=1)

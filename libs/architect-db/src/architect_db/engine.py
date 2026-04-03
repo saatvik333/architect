@@ -20,10 +20,10 @@ def create_engine(
 ) -> AsyncEngine:
     """Create an async SQLAlchemy engine backed by asyncpg.
 
-    Pool sizing rationale: each service opens at most ``pool_size +
-    max_overflow`` connections (3 + 5 = 8).  With 9 services this
-    gives a cluster-wide maximum of 72, safely under the Postgres
-    default ``max_connections = 100``.
+    Pool sizing: each service opens at most ``pool_size + max_overflow``
+    connections (5 + 5 = 10).  With 14 services this gives a cluster-wide
+    maximum of 140.  Ensure Postgres ``max_connections`` is set to at least
+    150 (default is 100 -- increase in production).
 
     Args:
         dsn: PostgreSQL connection string (``postgresql+asyncpg://...``).

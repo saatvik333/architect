@@ -13,12 +13,35 @@ import type {
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
+  const token = localStorage.getItem('auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const { headers: extraHeaders, ...rest } = options ?? {};
+
+  const timeout = AbortSignal.timeout(15_000);
+  const signal = options?.signal
+    ? AbortSignal.any([timeout, options.signal])
+    : timeout;
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      headers: { ...headers, ...(extraHeaders as Record<string, string>) },
+      ...rest,
+      signal,
+    });
+  } catch (err) {
+    if (err instanceof TypeError) {
+      throw new Error(`Network error: Unable to reach API`);
+    }
+    throw err;
+  }
   if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`);
+    const body = await response.json().catch(() => ({}));
+    const detail = (body as Record<string, unknown>).detail ?? response.statusText;
+    throw new Error(`API error ${response.status}: ${detail}`);
   }
   return response.json() as Promise<T>;
 }
@@ -74,7 +97,7 @@ export async function fetchEscalation(id: string, signal?: AbortSignal): Promise
 
 export async function resolveEscalation(
   id: string,
-  data: { resolved_by: string; resolution: string; custom_input?: string },
+  data: { resolved_by: string; resolution: string; custom_input?: Record<string, unknown> },
 ): Promise<Escalation> {
   return request<Escalation>(`/api/v1/escalations/${id}/resolve`, {
     method: 'POST',

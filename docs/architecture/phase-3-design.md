@@ -44,9 +44,14 @@ Phase 3 adds three components to ARCHITECT: persistent learning (Knowledge & Mem
 Real-time budget tracking with progressive enforcement, efficiency scoring, and spin detection.
 
 ### Progressive Enforcement
-- **80% ALERT** — Publish warning event, notify Human Interface
-- **95% RESTRICT** — Force tier downgrade to TIER_3, pause non-critical tasks
-- **100% HALT** — Cancel all tasks, generate progress report, escalate to human
+
+Thresholds are configurable via environment variables (`ECON_GOV_ALERT_THRESHOLD_PCT`, `ECON_GOV_RESTRICT_THRESHOLD_PCT`, `ECON_GOV_HALT_THRESHOLD_PCT`). Recommended defaults from `.env.example`:
+
+- **70% ALERT** — Publish warning event, notify Human Interface
+- **85% RESTRICT** — Force tier downgrade to TIER_3, pause non-critical tasks
+- **95% HALT** — Cancel all tasks, generate progress report, escalate to human
+
+Code defaults (if env vars are unset): 80% / 95% / 100%.
 
 ### Budget Allocation Formula
 ```
@@ -94,7 +99,7 @@ Configurable approval requirements per action type. Votes tracked individually. 
 - **Activity** — Real-time event stream via WebSocket + polling fallback
 
 ### WebSocket Architecture
-Human Interface service -> API Gateway WS proxy -> Dashboard browser client. Message types: escalation.created, escalation.resolved, approval.vote, event, progress.update, ping.
+Human Interface service -> API Gateway WS proxy -> Dashboard browser client. Message types: escalation_created, escalation_resolved, approval_gate_created, approval_vote_cast, event, progress.update, ping.
 
 ### Key Design Decisions
 - WebSocket for time-sensitive escalation notifications, polling fallback for reliability
@@ -122,3 +127,12 @@ Human Interface service -> API Gateway WS proxy -> Dashboard browser client. Mes
 ### architect-db
 - 10 new ORM models with repositories
 - Combined Alembic migration 005_add_phase3_tables
+
+## Known Limitations
+
+- **Knowledge query lacks semantic ranking** — The knowledge query endpoint does not generate embeddings for query text; results are returned in insertion order, not by semantic relevance.
+- **Stub Temporal activities** — Some Temporal activities in Knowledge & Memory still return stub data (`summarize_documentation`, `publish_knowledge_update`).
+- **Working memory (L0) is in-process only** — L0 memory is not backed by Redis yet; it is lost on service restart.
+- **Python-side cosine similarity** — Knowledge search computes cosine similarity in Python rather than using pgvector; a pgvector-based migration is planned.
+- **WebSocket token not validated against auth backend** — Token presence is checked but not verified against an authentication backend; any non-empty token is accepted.
+- **Economic Governor in-memory state between persistence points** — Budget state is persisted to Postgres on enforcement transitions and restored on startup, but consumption tracking between persistence points is per-instance and lost on crash.

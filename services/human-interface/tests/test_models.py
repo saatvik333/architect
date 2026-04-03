@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from architect_common.enums import (
     ApprovalGateStatus,
@@ -32,7 +33,7 @@ class TestModels:
 
     def test_escalation_option_frozen(self) -> None:
         opt = EscalationOption(label="Option A", description="Do X", tradeoff="Slower")
-        with pytest.raises(Exception):  # noqa: B017
+        with pytest.raises(ValidationError):
             opt.label = "Changed"  # type: ignore[misc]
 
     def test_escalation_option_creation(self) -> None:
@@ -53,7 +54,7 @@ class TestModels:
 
     def test_escalation_decision_frozen(self) -> None:
         dec = EscalationDecision(confidence=0.8)
-        with pytest.raises(Exception):  # noqa: B017
+        with pytest.raises(ValidationError):
             dec.confidence = 0.9  # type: ignore[misc]
 
     def test_create_escalation_request(self) -> None:
@@ -94,7 +95,7 @@ class TestModels:
             category=EscalationCategory.BUDGET,
             severity=EscalationSeverity.LOW,
         )
-        with pytest.raises(Exception):  # noqa: B017
+        with pytest.raises(ValidationError):
             resp.status = EscalationStatus.RESOLVED  # type: ignore[misc]
 
     def test_escalation_stats_response(self) -> None:
@@ -154,10 +155,10 @@ class TestModels:
             tests_passing=42,
             tests_failing=3,
             coverage_pct=85.5,
-            blockers=["flaky test"],
+            blockers=[],
         )
         assert prog.tasks_completed == 5
-        assert prog.blockers == ["flaky test"]
+        assert prog.blockers == []
 
     def test_activity_event(self) -> None:
         evt = ActivityEvent(
@@ -178,5 +179,5 @@ class TestModels:
 
     def test_websocket_message_frozen(self) -> None:
         msg = WebSocketMessage(type="test")
-        with pytest.raises(Exception):  # noqa: B017
+        with pytest.raises(ValidationError):
             msg.type = "changed"  # type: ignore[misc]

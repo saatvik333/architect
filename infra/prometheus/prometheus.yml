@@ -2,6 +2,14 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+rule_files:
+  - "alerts.yml"
+
 scrape_configs:
   - job_name: "architect-gateway"
     static_configs:
@@ -52,3 +60,41 @@ scrape_configs:
     static_configs:
       - targets: ["host.docker.internal:8013"]
     metrics_path: /metrics
+
+  - job_name: "architect-knowledge-memory"
+    static_configs:
+      - targets: ["host.docker.internal:8014"]
+    metrics_path: /metrics
+
+  - job_name: "architect-econ-gov"
+    static_configs:
+      - targets: ["host.docker.internal:8015"]
+    metrics_path: /metrics
+
+  - job_name: "architect-human-interface"
+    static_configs:
+      - targets: ["host.docker.internal:8016"]
+    metrics_path: /metrics
+
+  - job_name: "architect-security-immune"
+    static_configs:
+      - targets: ["host.docker.internal:8017"]
+    metrics_path: /metrics
+
+  - job_name: "architect-deploy-pipeline"
+    static_configs:
+      - targets: ["host.docker.internal:8018"]
+    metrics_path: /metrics
+
+  - job_name: "architect-failure-taxonomy"
+    static_configs:
+      - targets: ["host.docker.internal:8019"]
+    metrics_path: /metrics
+
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']

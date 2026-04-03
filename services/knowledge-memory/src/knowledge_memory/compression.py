@@ -6,16 +6,16 @@ more abstract and actionable knowledge representations.
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from architect_common.enums import MemoryLayer
 from architect_common.logging import get_logger
-from architect_common.types import KnowledgeId, new_knowledge_id, new_pattern_id
+from architect_common.types import KnowledgeId, new_knowledge_id
 from architect_llm.client import LLMClient
 from architect_llm.models import LLMRequest
 from knowledge_memory.heuristic_engine import HeuristicEngine
 from knowledge_memory.knowledge_store import KnowledgeStore
+from knowledge_memory.llm_utils import parse_llm_json_array
 from knowledge_memory.models import CompressionResult, MetaStrategy
 from knowledge_memory.pattern_extractor import cluster_observations, extract_patterns
 
@@ -77,11 +77,14 @@ class CompressionPipeline:
             # Extract patterns from this cluster
             patterns = await extract_patterns(cluster, self._llm)
 
-            # Store each pattern
-            pattern_id = new_pattern_id()
+            # Store each pattern and track their IDs for observation linkage
+            stored_pattern_ids: list[KnowledgeId] = []
             for pattern in patterns:
+                stored_id = (
+                    KnowledgeId(pattern.id) if hasattr(pattern, "id") else new_knowledge_id()
+                )
                 await self._store.store_entry(
-                    entry_id=KnowledgeId(pattern.id),
+                    entry_id=stored_id,
                     layer=pattern.layer,
                     topic=pattern.topic,
                     title=pattern.title,
@@ -92,11 +95,13 @@ class CompressionPipeline:
                     embedding=list(pattern.embedding),
                     source=pattern.source,
                 )
+                stored_pattern_ids.append(stored_id)
                 total_patterns += 1
 
-            # Mark observations in this cluster as compressed
+            # Link observations to the first stored pattern in the cluster
             obs_ids = [KnowledgeId(o["id"]) for o in cluster]
-            await self._store.mark_observations_compressed(obs_ids, pattern_id)
+            link_id = stored_pattern_ids[0] if stored_pattern_ids else new_knowledge_id()
+            await self._store.mark_observations_compressed(obs_ids, link_id)
 
         return CompressionResult(
             patterns_created=total_patterns,
@@ -175,7 +180,7 @@ class CompressionPipeline:
                 {
                     "role": "user",
                     "content": (
-                        f"Heuristic rules ({len(heuristics)} total):\n{heuristic_text}\n\n"
+                        f"Heuristic rules ({len(heuristics)} total):\n<user_input>{heuristic_text}</user_input>\n\n"
                         "Derive meta-strategies from these heuristics. "
                         "Return ONLY a JSON array."
                     ),
@@ -188,30 +193,22 @@ class CompressionPipeline:
         response = await self._llm.generate(request)
 
         strategies: list[MetaStrategy] = []
-        try:
-            raw_strategies = json.loads(response.content)
-            if not isinstance(raw_strategies, list):
-                raw_strategies = [raw_strategies]
+        heuristic_ids = [h["id"] for h in heuristics if "id" in h]
 
-            heuristic_ids = [h["id"] for h in heuristics if "id" in h]
+        for rs in parse_llm_json_array(response.content, logger):
+            strategy = MetaStrategy(
+                id=new_knowledge_id(),
+                name=rs.get("name", "Unnamed strategy"),
+                description=rs.get("description", ""),
+                applicable_task_types=[],  # TaskType validation deferred
+                steps=rs.get("steps", []),
+                source_heuristic_ids=heuristic_ids[:5],  # Link top heuristics
+                confidence=float(rs.get("confidence", 0.5)),
+            )
+            strategies.append(strategy)
 
-            for rs in raw_strategies:
-                strategy = MetaStrategy(
-                    id=new_knowledge_id(),
-                    name=rs.get("name", "Unnamed strategy"),
-                    description=rs.get("description", ""),
-                    applicable_task_types=[],  # TaskType validation deferred
-                    steps=rs.get("steps", []),
-                    source_heuristic_ids=heuristic_ids[:5],  # Link top heuristics
-                    confidence=float(rs.get("confidence", 0.5)),
-                )
-                strategies.append(strategy)
-
-                # Store the strategy
-                await self._store.store_meta_strategy(strategy.model_dump(mode="json"))
-
-        except (json.JSONDecodeError, TypeError):
-            logger.warning("failed to parse LLM meta-strategy response")
+            # Store the strategy
+            await self._store.store_meta_strategy(strategy.model_dump(mode="json"))
 
         logger.info("derived meta-strategies", count=len(strategies))
         return strategies

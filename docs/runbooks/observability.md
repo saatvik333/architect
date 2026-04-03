@@ -62,6 +62,9 @@ Set `OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317` to enable export (disabled 
 
 - `api-gateway` (port 8000)
 - `world-state-ledger` (port 8001)
+- `knowledge-memory` (port 8014)
+- `economic-governor` (port 8015)
+- `human-interface` (port 8016)
 
 Other services can be instrumented by following the same pattern.
 
@@ -186,6 +189,9 @@ Resource limits are defined in `infra/docker-compose.yml` under each service's `
 | Multi-Model Router | 8011 | Model tier routing |
 | Codebase Comprehension | 8012 | AST indexing + embeddings |
 | Agent Comm Bus | 8013 | NATS message bus API |
+| Knowledge & Memory | 8014 | Knowledge store + memory hierarchy |
+| Economic Governor | 8015 | Budget tracking + enforcement |
+| Human Interface | 8016 | Escalations + approvals + WebSocket |
 | Jaeger UI | 16686 | Distributed tracing |
 | Jaeger OTLP | 4317 | Trace ingestion (gRPC) |
 | Prometheus | 9090 | Metrics collection |

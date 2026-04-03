@@ -14,9 +14,27 @@ from architect_common.types import HeuristicId, new_heuristic_id
 from architect_llm.client import LLMClient
 from architect_llm.models import LLMRequest
 from knowledge_memory.knowledge_store import KnowledgeStore
+from knowledge_memory.llm_utils import parse_llm_json_array
 from knowledge_memory.models import HeuristicRule
 
 logger = get_logger(component="knowledge_memory.heuristic_engine")
+
+_STOP_WORDS = frozenset(
+    {
+        "when",
+        "then",
+        "with",
+        "that",
+        "this",
+        "from",
+        "have",
+        "been",
+        "will",
+        "each",
+        "into",
+        "also",
+    }
+)
 
 
 class HeuristicEngine:
@@ -49,9 +67,10 @@ class HeuristicEngine:
         for h in raw_heuristics:
             # Basic keyword matching against condition
             condition = h.get("condition", "")
-            if task_type and task_type not in condition and domain and domain not in condition:
-                # Loose match: include if domain matches
-                pass
+            matches_task = task_type is None or task_type in condition
+            matches_domain = domain is None or domain in condition
+            if not matches_task and not matches_domain:
+                continue
 
             source_ids = h.get("source_pattern_ids", [])
             if isinstance(source_ids, str):
@@ -78,7 +97,11 @@ class HeuristicEngine:
             results = [
                 r
                 for r in results
-                if any(word in context_str for word in r.condition.lower().split() if len(word) > 3)
+                if any(
+                    word in context_str
+                    for word in r.condition.lower().split()
+                    if len(word) > 4 and word not in _STOP_WORDS
+                )
                 or not context_str  # include all if context is effectively empty
             ]
 
@@ -132,8 +155,8 @@ class HeuristicEngine:
                 {
                     "role": "user",
                     "content": (
-                        f"Domain: {domain}\n\n"
-                        f"Patterns ({len(patterns)} total):\n{pattern_text}\n\n"
+                        f"Domain: <user_input>{domain}</user_input>\n\n"
+                        f"Patterns ({len(patterns)} total):\n<user_input>{pattern_text}</user_input>\n\n"
                         "Synthesize heuristic rules from these patterns. "
                         "Return ONLY a JSON array."
                     ),
@@ -146,23 +169,16 @@ class HeuristicEngine:
         response = await self._llm.generate(request)
 
         rules: list[HeuristicRule] = []
-        try:
-            raw_rules = json.loads(response.content)
-            if not isinstance(raw_rules, list):
-                raw_rules = [raw_rules]
-
-            for rr in raw_rules:
-                rule = HeuristicRule(
-                    id=new_heuristic_id(),
-                    domain=rr.get("domain", domain),
-                    condition=rr.get("condition", ""),
-                    action=rr.get("action", ""),
-                    rationale=rr.get("rationale", ""),
-                    confidence=float(rr.get("confidence", 0.5)),
-                )
-                rules.append(rule)
-        except (json.JSONDecodeError, TypeError):
-            logger.warning("failed to parse LLM heuristic response")
+        for rr in parse_llm_json_array(response.content, logger):
+            rule = HeuristicRule(
+                id=new_heuristic_id(),
+                domain=rr.get("domain", domain),
+                condition=rr.get("condition", ""),
+                action=rr.get("action", ""),
+                rationale=rr.get("rationale", ""),
+                confidence=float(rr.get("confidence", 0.5)),
+            )
+            rules.append(rule)
 
         logger.info("synthesized heuristics", count=len(rules), domain=domain)
         return rules

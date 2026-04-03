@@ -5,10 +5,12 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from architect_common.enums import HealthStatus
+from architect_common.health import HealthResponse
+from architect_common.logging import get_logger
 from architect_common.types import AgentId, HeuristicId, KnowledgeId, TaskId
 from knowledge_memory.heuristic_engine import HeuristicEngine
 from knowledge_memory.knowledge_store import KnowledgeStore
@@ -26,20 +28,12 @@ from knowledge_memory.working_memory import WorkingMemoryStore
 
 from .dependencies import get_heuristic_engine, get_knowledge_store, get_working_memory
 
-router = APIRouter()
+logger = get_logger(component="knowledge_memory.api.routes")
 
-_SERVICE_STARTED_AT = time.monotonic()
+router = APIRouter()
 
 
 # ── Request / Response schemas ─────────────────────────────────────
-
-
-class HealthResponse(BaseModel):
-    """Response body for GET /health."""
-
-    service: str = "knowledge-memory"
-    status: HealthStatus
-    uptime_seconds: float = 0.0
 
 
 class WorkingMemoryUpdate(BaseModel):
@@ -71,10 +65,18 @@ async def query_knowledge(
     store: KnowledgeStore = Depends(get_knowledge_store),
 ) -> KnowledgeQueryResult:
     """Search knowledge entries by semantic similarity and filters."""
-    # For now, use an empty embedding for the query
-    # In production, this would use the embedding model to encode the query
+    # NOTE: query_embedding=[] means semantic ranking is NOT applied.
+    # The store falls back to metadata-only filtering (layer, topic, content_type).
+    # Once the embedding service is integrated, the query text should be encoded
+    # here via the embedding model before being passed to store.search().
+    query_embedding: list[float] = []
+    logger.warning(
+        "semantic_search_degraded",
+        reason="embedding service not yet integrated; results use metadata filtering only",
+        query_topic=body.topic,
+    )
     results = await store.search(
-        query_embedding=[],
+        query_embedding=query_embedding,
         layer=body.layer,
         topic=body.topic,
         content_type=body.content_type,
@@ -301,9 +303,28 @@ async def list_meta_strategies(
 
 
 @router.get("/health", response_model=HealthResponse)
-async def health_check() -> HealthResponse:
+async def health_check(request: Request) -> HealthResponse:
     """Service health check endpoint."""
+    status = HealthStatus.HEALTHY
+
+    try:
+        get_knowledge_store()
+    except RuntimeError:
+        status = HealthStatus.DEGRADED
+
+    try:
+        get_working_memory()
+    except RuntimeError:
+        status = HealthStatus.DEGRADED
+
+    try:
+        get_heuristic_engine()
+    except RuntimeError:
+        status = HealthStatus.DEGRADED
+
+    uptime = time.monotonic() - getattr(request.app.state, "started_at", time.monotonic())
     return HealthResponse(
-        status=HealthStatus.HEALTHY,
-        uptime_seconds=round(time.monotonic() - _SERVICE_STARTED_AT, 1),
+        service="knowledge-memory",
+        status=status,
+        uptime_seconds=round(uptime, 2),
     )

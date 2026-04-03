@@ -1,0 +1,75 @@
+groups:
+  - name: service_health
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.job }} has been down for more than 1 minute."
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+          description: "{{ $labels.job }} has >5% error rate for 5 minutes."
+
+  - name: budget_alerts
+    rules:
+      - alert: BudgetWarning
+        expr: architect_budget_consumed_pct > 70
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Budget consumption at {{ $value }}%"
+          description: "ARCHITECT budget is above 70% consumed."
+
+      - alert: BudgetCritical
+        expr: architect_budget_consumed_pct > 85
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Budget consumption critical at {{ $value }}%"
+          description: "ARCHITECT budget is above 85% consumed. Restriction enforcement may be active."
+
+      - alert: BudgetHalt
+        expr: architect_budget_consumed_pct > 95
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Budget HALT threshold reached at {{ $value }}%"
+          description: "ARCHITECT budget has reached halt threshold. All operations should be suspended."
+
+  - name: infrastructure
+    rules:
+      - alert: PostgresConnectionPoolExhausted
+        expr: pg_stat_activity_count / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Postgres connection pool at {{ $value | humanizePercentage }}"
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage at {{ $value | humanizePercentage }}"
+
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 latency above 2s on {{ $labels.job }}"

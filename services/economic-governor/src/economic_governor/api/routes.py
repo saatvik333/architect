@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import time
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from architect_common.enums import EnforcementLevel, HealthStatus
+from architect_common.health import HealthResponse
 from architect_common.types import AgentId
 from economic_governor.budget_tracker import BudgetTracker
 from economic_governor.efficiency_scorer import EfficiencyScorer
@@ -25,18 +26,8 @@ from .dependencies import get_budget_tracker, get_efficiency_scorer, get_enforce
 
 router = APIRouter()
 
-_SERVICE_STARTED_AT = time.monotonic()
-
 
 # ── Request / Response schemas ────────────────────────────────────
-
-
-class HealthResponse(BaseModel):
-    """Response body for GET /health."""
-
-    service: str = "economic-governor"
-    status: HealthStatus
-    uptime_seconds: float = 0.0
 
 
 class RecordConsumptionRequest(BaseModel):
@@ -75,7 +66,7 @@ async def get_budget_status(
     tracker: BudgetTracker = Depends(get_budget_tracker),
 ) -> BudgetSnapshot:
     """Return the current budget snapshot."""
-    return tracker.get_snapshot()
+    return await tracker.get_snapshot()
 
 
 @router.get("/api/v1/budget/phases", response_model=list[PhaseStatus])
@@ -83,7 +74,8 @@ async def get_budget_phases(
     tracker: BudgetTracker = Depends(get_budget_tracker),
 ) -> list[PhaseStatus]:
     """Return per-phase budget breakdown."""
-    return tracker.get_snapshot().phase_breakdown
+    snapshot = await tracker.get_snapshot()
+    return snapshot.phase_breakdown
 
 
 @router.post("/api/v1/budget/allocate", response_model=BudgetAllocationResult)
@@ -101,7 +93,7 @@ async def record_consumption(
     tracker: BudgetTracker = Depends(get_budget_tracker),
 ) -> RecordConsumptionResponse:
     """Record token consumption and return the current enforcement level."""
-    level = tracker.record_consumption(
+    level = await tracker.record_consumption(
         agent_id=body.agent_id,
         tokens=body.tokens,
         cost_usd=body.cost_usd,
@@ -114,7 +106,7 @@ async def get_leaderboard(
     scorer: EfficiencyScorer = Depends(get_efficiency_scorer),
 ) -> LeaderboardResponse:
     """Return the agent efficiency leaderboard."""
-    board = scorer.compute_scores()
+    board = await scorer.compute_scores()
     return LeaderboardResponse(
         entries=board.entries,
         computed_at=board.computed_at.isoformat(),
@@ -127,7 +119,7 @@ async def get_agent_efficiency(
     scorer: EfficiencyScorer = Depends(get_efficiency_scorer),
 ) -> AgentEfficiencyScore:
     """Return efficiency score for a specific agent."""
-    return scorer.get_agent_score(AgentId(agent_id))
+    return await scorer.get_agent_score(AgentId(agent_id))
 
 
 @router.get("/api/v1/enforcement/history", response_model=list[EnforcementRecord])
@@ -143,7 +135,7 @@ async def get_current_enforcement_level(
     tracker: BudgetTracker = Depends(get_budget_tracker),
 ) -> EnforcementLevelResponse:
     """Return the current enforcement level."""
-    snapshot = tracker.get_snapshot()
+    snapshot = await tracker.get_snapshot()
     return EnforcementLevelResponse(
         level=snapshot.enforcement_level,
         consumed_pct=snapshot.consumed_pct,
@@ -151,9 +143,28 @@ async def get_current_enforcement_level(
 
 
 @router.get("/health", response_model=HealthResponse)
-async def health_check() -> HealthResponse:
+async def health_check(request: Request) -> HealthResponse:
     """Service health check endpoint."""
+    status = HealthStatus.HEALTHY
+
+    try:
+        get_budget_tracker()
+    except RuntimeError:
+        status = HealthStatus.DEGRADED
+
+    try:
+        get_efficiency_scorer()
+    except RuntimeError:
+        status = HealthStatus.DEGRADED
+
+    try:
+        get_enforcer()
+    except RuntimeError:
+        status = HealthStatus.DEGRADED
+
+    uptime = time.monotonic() - getattr(request.app.state, "started_at", time.monotonic())
     return HealthResponse(
-        status=HealthStatus.HEALTHY,
-        uptime_seconds=round(time.monotonic() - _SERVICE_STARTED_AT, 1),
+        service="economic-governor",
+        status=status,
+        uptime_seconds=round(uptime, 2),
     )

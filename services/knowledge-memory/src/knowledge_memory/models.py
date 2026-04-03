@@ -54,6 +54,7 @@ class Observation(ArchitectBase):
     context: dict[str, object] = Field(default_factory=dict)
     outcome: str = ""
     domain: str = ""
+    project_id: str = Field(default="", description="Project scope; empty = global.")
     embedding: list[float] = Field(default_factory=list)
     compressed: bool = False
     pattern_id: PatternId | None = None
@@ -72,6 +73,7 @@ class HeuristicRule(ArchitectBase):
     success_count: int = 0
     failure_count: int = 0
     active: bool = True
+    project_id: str = Field(default="", description="Project scope; empty = global.")
     source_pattern_ids: list[PatternId] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utcnow)
 
@@ -86,6 +88,16 @@ class MetaStrategy(ArchitectBase):
     steps: list[str] = Field(default_factory=list)
     source_heuristic_ids: list[HeuristicId] = Field(default_factory=list)
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    # Phase 4: A/B testing and validation
+    validation_status: str = Field(
+        default="unvalidated",
+        description="Validation state: unvalidated, testing, validated, rejected.",
+    )
+    tasks_applied: int = Field(default=0, ge=0)
+    tasks_succeeded: int = Field(default=0, ge=0)
+    tasks_failed: int = Field(default=0, ge=0)
+    ab_test_group: str = Field(default="", description="'control' or 'experiment'.")
+    ab_test_id: str = Field(default="", description="Links strategies being compared.")
     created_at: datetime = Field(default_factory=utcnow)
 
 

@@ -29,12 +29,13 @@ function Escalations() {
     [],
   );
 
-  const { data: escalations, error, loading } = usePolling(escalationsFetcher, 3000);
+  const { data: escalations, error, loading } = usePolling(escalationsFetcher, 10000);
   const { data: stats } = usePolling(statsFetcher, 5000);
 
   const handleResolve = async (escalation: Escalation, resolution: string, customInput?: string) => {
     try {
       await resolveEscalation(escalation.id, {
+        // TODO: derive resolved_by from authenticated user identity
         resolved_by: 'dashboard_user',
         resolution,
         custom_input: customInput,

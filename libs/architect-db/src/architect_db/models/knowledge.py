@@ -10,6 +10,7 @@ from sqlalchemy import Boolean, DateTime, Float, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from architect_common.enums import ContentType, MemoryLayer, ObservationType
 from architect_db.models.base import Base, UUIDPrimaryKeyMixin
 
 
@@ -21,11 +22,15 @@ class KnowledgeEntry(UUIDPrimaryKeyMixin, Base):
 
     __tablename__ = "knowledge_entries"
 
-    layer: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    layer: Mapped[str] = mapped_column(
+        sa.Enum(MemoryLayer, native_enum=False, length=64), nullable=False, index=True
+    )
     topic: Mapped[str] = mapped_column(Text, nullable=False, index=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    content_type: Mapped[str] = mapped_column(Text, nullable=False)
+    content_type: Mapped[str] = mapped_column(
+        sa.Enum(ContentType, native_enum=False, length=64), nullable=False
+    )
 
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     version_tag: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -65,7 +70,9 @@ class KnowledgeObservation(UUIDPrimaryKeyMixin, Base):
 
     task_id: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     agent_id: Mapped[str | None] = mapped_column(Text, nullable=True)
-    observation_type: Mapped[str] = mapped_column(Text, nullable=False)
+    observation_type: Mapped[str] = mapped_column(
+        sa.Enum(ObservationType, native_enum=False, length=64), nullable=False
+    )
     description: Mapped[str] = mapped_column(Text, nullable=False)
 
     context: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)

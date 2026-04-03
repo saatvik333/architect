@@ -37,6 +37,13 @@ phase-2:
           - "services/agent-comm-bus/**"
           - "apps/dashboard/**"
 
+phase-3:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "services/knowledge-memory/**"
+          - "services/economic-governor/**"
+          - "services/human-interface/**"
+
 temporal:
   - changed-files:
       - any-glob-to-any-file:

@@ -110,6 +110,7 @@ BLOCKED_COMMANDS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"mknod\b", _I), "device file creation"),
     # ── Dangerous find with exec ────────────────────────────────
     (re.compile(r"find\s+.*-exec\b", _I), "find with exec chain"),
+    (re.compile(r"find\s+.*-execdir\b", _I), "find with execdir chain"),
     # ── Shell eval / exec builtins ──────────────────────────────
     (re.compile(r"\beval\s+", _I), "shell eval"),
     (re.compile(r"\bexec\s+", _I), "exec builtin"),

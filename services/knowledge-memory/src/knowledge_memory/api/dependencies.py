@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from architect_common.dependencies import ServiceDependency
 from knowledge_memory.config import KnowledgeMemoryConfig
 from knowledge_memory.heuristic_engine import HeuristicEngine
 from knowledge_memory.knowledge_store import KnowledgeStore
@@ -16,56 +17,20 @@ def get_config() -> KnowledgeMemoryConfig:
     return KnowledgeMemoryConfig()
 
 
-_knowledge_store: KnowledgeStore | None = None
-_working_memory: WorkingMemoryStore | None = None
-_heuristic_engine: HeuristicEngine | None = None
+_knowledge_store = ServiceDependency[KnowledgeStore]("KnowledgeStore")
+_working_memory = ServiceDependency[WorkingMemoryStore]("WorkingMemoryStore")
+_heuristic_engine = ServiceDependency[HeuristicEngine]("HeuristicEngine")
 
-
-def get_knowledge_store() -> KnowledgeStore:
-    """Return the shared :class:`KnowledgeStore` instance."""
-    if _knowledge_store is None:
-        msg = "KnowledgeStore not initialized. Service lifespan has not started."
-        raise RuntimeError(msg)
-    return _knowledge_store
-
-
-def set_knowledge_store(store: KnowledgeStore) -> None:
-    """Set the shared :class:`KnowledgeStore` instance."""
-    global _knowledge_store
-    _knowledge_store = store
-
-
-def get_working_memory() -> WorkingMemoryStore:
-    """Return the shared :class:`WorkingMemoryStore` instance."""
-    if _working_memory is None:
-        msg = "WorkingMemoryStore not initialized. Service lifespan has not started."
-        raise RuntimeError(msg)
-    return _working_memory
-
-
-def set_working_memory(store: WorkingMemoryStore) -> None:
-    """Set the shared :class:`WorkingMemoryStore` instance."""
-    global _working_memory
-    _working_memory = store
-
-
-def get_heuristic_engine() -> HeuristicEngine:
-    """Return the shared :class:`HeuristicEngine` instance."""
-    if _heuristic_engine is None:
-        msg = "HeuristicEngine not initialized. Service lifespan has not started."
-        raise RuntimeError(msg)
-    return _heuristic_engine
-
-
-def set_heuristic_engine(engine: HeuristicEngine) -> None:
-    """Set the shared :class:`HeuristicEngine` instance."""
-    global _heuristic_engine
-    _heuristic_engine = engine
+get_knowledge_store = _knowledge_store.get
+set_knowledge_store = _knowledge_store.set
+get_working_memory = _working_memory.get
+set_working_memory = _working_memory.set
+get_heuristic_engine = _heuristic_engine.get
+set_heuristic_engine = _heuristic_engine.set
 
 
 async def cleanup() -> None:
     """Close shared resources on shutdown."""
-    global _knowledge_store, _working_memory, _heuristic_engine
-    _knowledge_store = None
-    _working_memory = None
-    _heuristic_engine = None
+    await _knowledge_store.cleanup()
+    await _working_memory.cleanup()
+    await _heuristic_engine.cleanup()
