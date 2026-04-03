@@ -51,9 +51,12 @@ if [ ! -f .env ]; then
     if [ -f .env.example ]; then
         cp .env.example .env
 
-        # Auto-generate strong passwords
+        # Auto-generate strong passwords/tokens
         PG_PASS="$(openssl rand -hex 16)"
         REDIS_PASS="$(openssl rand -hex 16)"
+        GRAFANA_PASS="$(openssl rand -hex 16)"
+        NATS_TOK="$(openssl rand -hex 16)"
+        WS_TOK="$(openssl rand -hex 32)"
 
         # Portable in-place sed (works on macOS and Linux)
         if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -66,6 +69,9 @@ if [ ! -f .env ]; then
         "${SED_I[@]}" "s|^ARCHITECT_PG_PASSWORD=.*|ARCHITECT_PG_PASSWORD=${PG_PASS}|" .env
         "${SED_I[@]}" "s|^REDIS_PASSWORD=.*|REDIS_PASSWORD=${REDIS_PASS}|" .env
         "${SED_I[@]}" "s|^ARCHITECT_REDIS_PASSWORD=.*|ARCHITECT_REDIS_PASSWORD=${REDIS_PASS}|" .env
+        "${SED_I[@]}" "s|^GRAFANA_PASSWORD=.*|GRAFANA_PASSWORD=${GRAFANA_PASS}|" .env
+        "${SED_I[@]}" "s|^NATS_TOKEN=.*|NATS_TOKEN=${NATS_TOK}|" .env
+        "${SED_I[@]}" "s|^ARCHITECT_WS_TOKEN=.*|ARCHITECT_WS_TOKEN=${WS_TOK}|" .env
 
         ok "Created .env with auto-generated credentials."
     else

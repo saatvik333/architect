@@ -6,7 +6,9 @@ import ActivityItem from '../components/ActivityItem';
 import type { ActivityEvent } from '../api/types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const WS_URL = API_URL.replace(/^http/, 'ws') + '/api/v1/activity/ws';
+const wsUrl = new URL(API_URL);
+wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+const WS_URL = wsUrl.toString().replace(/\/$/, '') + '/api/v1/ws';
 
 const EVENT_TYPES = ['all', 'task', 'proposal', 'escalation', 'approval', 'build', 'deploy', 'test', 'error'];
 

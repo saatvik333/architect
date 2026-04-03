@@ -25,6 +25,9 @@ SERVICES: dict[str, str] = {
     "multi-model-router": "http://localhost:8011",
     "codebase-comprehension": "http://localhost:8012",
     "agent-comm-bus": "http://localhost:8013",
+    "economic-governor": "http://localhost:8015",
+    "human-interface": "http://localhost:8016",
+    "knowledge-memory": "http://localhost:8014",
 }
 
 # ANSI colors

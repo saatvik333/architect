@@ -119,3 +119,10 @@ See `.env.example` for all available configuration. Key variables:
 - **Evaluation Engine**: Stateless but typically one evaluator per task
 - **Coding Agent**: Stateless per-task execution
 - **Agent Comm Bus**: NATS handles distribution; multiple instances OK
+- **Economic Governor**: In-memory state + single Redis consumer; cannot horizontally scale without shared persistent state
+
+### Phase 3 Scaling Notes
+
+- **Knowledge & Memory**: Can scale horizontally (all state is DB-backed via Postgres + pgvector)
+- **Human Interface**: Needs sticky sessions for WebSocket connections, or Redis pub/sub for broadcast coordination across instances
+- **Economic Governor**: Partially scalable. Budget state persisted to Postgres on enforcement transitions and restored on startup. However, in-memory consumption tracking between persistence points is per-instance. Horizontal scaling requires Redis-based atomic counters for consumption tracking.

@@ -121,10 +121,6 @@ class TestEnforcer:
         history = enforcer.get_history()
         assert len(history) == 2
 
-    async def test_startup_shutdown_lifecycle(self, enforcer: Enforcer) -> None:
-        """startup/shutdown should manage the HTTP client lifecycle."""
-        await enforcer.startup()
-        assert enforcer._client is not None
-
-        await enforcer.shutdown()
-        assert enforcer._client is None
+    async def test_enforcer_has_no_http_client(self, enforcer: Enforcer) -> None:
+        """Enforcer should not create an HTTP client (removed as unused)."""
+        assert not hasattr(enforcer, "_client")

@@ -725,10 +725,26 @@ version = "0.1.0"
 source = { editable = "services/deployment-pipeline" }
 dependencies = [
     { name = "architect-common" },
+    { name = "architect-events" },
+    { name = "architect-observability" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "pydantic-settings" },
+    { name = "temporalio" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "architect-common", editable = "libs/architect-common" }]
+requires-dist = [
+    { name = "architect-common", editable = "libs/architect-common" },
+    { name = "architect-events", editable = "libs/architect-events" },
+    { name = "architect-observability", editable = "libs/architect-observability" },
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "pydantic-settings", specifier = ">=2.0" },
+    { name = "temporalio", specifier = ">=1.9" },
+    { name = "uvicorn", specifier = ">=0.32" },
+]
 
 [[package]]
 name = "distlib"
@@ -846,6 +862,7 @@ dependencies = [
     { name = "architect-observability" },
     { name = "docker" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "uvicorn" },
 ]
 
@@ -856,6 +873,7 @@ requires-dist = [
     { name = "architect-observability", editable = "libs/architect-observability" },
     { name = "docker", specifier = ">=7.0" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
 
@@ -866,12 +884,28 @@ source = { editable = "services/failure-taxonomy" }
 dependencies = [
     { name = "architect-common" },
     { name = "architect-db" },
+    { name = "architect-events" },
+    { name = "architect-llm" },
+    { name = "architect-observability" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "pydantic-settings" },
+    { name = "temporalio" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "architect-common", editable = "libs/architect-common" },
     { name = "architect-db", editable = "libs/architect-db" },
+    { name = "architect-events", editable = "libs/architect-events" },
+    { name = "architect-llm", editable = "libs/architect-llm" },
+    { name = "architect-observability", editable = "libs/architect-observability" },
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "pydantic-settings", specifier = ">=2.0" },
+    { name = "temporalio", specifier = ">=1.9" },
+    { name = "uvicorn", specifier = ">=0.32" },
 ]
 
 [[package]]
@@ -2781,10 +2815,30 @@ version = "0.1.0"
 source = { editable = "services/security-immune" }
 dependencies = [
     { name = "architect-common" },
+    { name = "architect-db" },
+    { name = "architect-events" },
+    { name = "architect-observability" },
+    { name = "bandit" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "redis", extra = ["hiredis"] },
+    { name = "temporalio" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "architect-common", editable = "libs/architect-common" }]
+requires-dist = [
+    { name = "architect-common", editable = "libs/architect-common" },
+    { name = "architect-db", editable = "libs/architect-db" },
+    { name = "architect-events", editable = "libs/architect-events" },
+    { name = "architect-observability", editable = "libs/architect-observability" },
+    { name = "bandit", specifier = ">=1.8" },
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "redis", extras = ["hiredis"], specifier = ">=5.0" },
+    { name = "temporalio", specifier = ">=1.9" },
+    { name = "uvicorn", specifier = ">=0.32" },
+]
 
 [[package]]
 name = "sentence-transformers"
