@@ -135,6 +135,21 @@ class EventType(StrEnum):
     APPROVAL_REQUESTED = "approval.requested"
     APPROVAL_GRANTED = "approval.granted"
     APPROVAL_DENIED = "approval.denied"
+    # Security Immune
+    SECURITY_SCAN_STARTED = "security.scan_started"
+    SECURITY_SCAN_COMPLETED = "security.scan_completed"
+    SECURITY_FINDING_CREATED = "security.finding_created"
+    SECURITY_POLICY_VIOLATION = "security.policy_violation"
+    SECURITY_GATE_BLOCKED = "security.gate_blocked"
+    # Deployment Pipeline
+    DEPLOYMENT_STARTED = "deployment.started"
+    DEPLOYMENT_STAGE_CHANGED = "deployment.stage_changed"
+    DEPLOYMENT_COMPLETED = "deployment.completed"
+    DEPLOYMENT_ROLLED_BACK = "deployment.rolled_back"
+    # Failure Taxonomy
+    FAILURE_CLASSIFIED = "failure.classified"
+    IMPROVEMENT_PROPOSED = "improvement.proposed"
+    POST_MORTEM_COMPLETED = "post_mortem.completed"
 
 
 class EvalLayer(StrEnum):
@@ -216,3 +231,96 @@ class ApprovalGateStatus(StrEnum):
     APPROVED = "approved"
     DENIED = "denied"
     EXPIRED = "expired"
+
+
+# ── Phase 4: Security Immune System ─────────────────────────────
+class ScanType(StrEnum):
+    DEPENDENCY_AUDIT = "dependency_audit"
+    CODE_SCAN = "code_scan"
+    PROMPT_INJECTION = "prompt_injection"
+    RUNTIME_ANOMALY = "runtime_anomaly"
+    POLICY_CHECK = "policy_check"
+
+
+class FindingSeverity(StrEnum):
+    INFO = "info"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class FindingStatus(StrEnum):
+    OPEN = "open"
+    ACKNOWLEDGED = "acknowledged"
+    MITIGATED = "mitigated"
+    FALSE_POSITIVE = "false_positive"
+
+
+class ScanVerdict(StrEnum):
+    PASS = "pass"
+    WARN = "warn"
+    FAIL = "fail"
+
+
+class PolicyAction(StrEnum):
+    BLOCK = "block"
+    WARN = "warn"
+    LOG = "log"
+
+
+# ── Phase 4: Deployment Pipeline ────────────────────────────────
+class DeploymentStatus(StrEnum):
+    PENDING = "pending"
+    STAGING = "staging"
+    SMOKE_TESTING = "smoke_testing"
+    AWAITING_APPROVAL = "awaiting_approval"
+    CANARY = "canary"
+    ROLLING_OUT = "rolling_out"
+    VERIFYING = "verifying"
+    COMPLETED = "completed"
+    ROLLED_BACK = "rolled_back"
+    FAILED = "failed"
+
+
+class DeploymentStage(StrEnum):
+    STAGING = "staging"
+    CANARY_5 = "canary_5"
+    ROLLOUT_25 = "rollout_25"
+    ROLLOUT_50 = "rollout_50"
+    ROLLOUT_100 = "rollout_100"
+
+
+class RollbackReason(StrEnum):
+    ERROR_RATE_EXCEEDED = "error_rate_exceeded"
+    LATENCY_EXCEEDED = "latency_exceeded"
+    SMOKE_TEST_FAILED = "smoke_test_failed"
+    VERIFICATION_FAILED = "verification_failed"
+    MANUAL = "manual"
+    APPROVAL_DENIED = "approval_denied"
+
+
+# ── Phase 4: Failure Taxonomy ───────────────────────────────────
+class FailureCode(StrEnum):
+    F1_SPEC_AMBIGUITY = "f1_spec_ambiguity"
+    F2_ARCHITECTURE_ERROR = "f2_architecture_error"
+    F3_HALLUCINATION = "f3_hallucination"
+    F4_TOOL_FAILURE = "f4_tool_failure"
+    F5_DEPENDENCY_ISSUE = "f5_dependency_issue"
+    F6_LOGIC_BUG = "f6_logic_bug"
+    F7_UX_REJECTION = "f7_ux_rejection"
+    F8_PERF_REGRESSION = "f8_perf_regression"
+    F9_SECURITY_VULN = "f9_security_vuln"
+
+
+class ImprovementType(StrEnum):
+    PROMPT_IMPROVEMENT = "prompt_improvement"
+    ADVERSARIAL_TEST = "adversarial_test"
+    HEURISTIC_UPDATE = "heuristic_update"
+    TOPOLOGY_RECOMMENDATION = "topology_recommendation"
+
+
+class PostMortemStatus(StrEnum):
+    PENDING = "pending"
+    ANALYZING = "analyzing"
+    COMPLETED = "completed"

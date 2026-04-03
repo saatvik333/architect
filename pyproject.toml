@@ -61,6 +61,9 @@ known-first-party = [
     "knowledge_memory",
     "economic_governor",
     "human_interface",
+    "security_immune",
+    "deployment_pipeline",
+    "failure_taxonomy",
 ]
 
 [tool.ruff.format]

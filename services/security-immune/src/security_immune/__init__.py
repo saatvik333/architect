@@ -1,1 +1,1 @@
-"""ARCHITECT Security & Immune System — threat detection and sandboxing. Phase 3 implementation."""
+"""ARCHITECT Security & Immune System — threat detection, vulnerability scanning, and policy enforcement."""

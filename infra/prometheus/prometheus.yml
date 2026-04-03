@@ -76,6 +76,21 @@ scrape_configs:
       - targets: ["host.docker.internal:8016"]
     metrics_path: /metrics
 
+  - job_name: "architect-security-immune"
+    static_configs:
+      - targets: ["host.docker.internal:8017"]
+    metrics_path: /metrics
+
+  - job_name: "architect-deploy-pipeline"
+    static_configs:
+      - targets: ["host.docker.internal:8018"]
+    metrics_path: /metrics
+
+  - job_name: "architect-failure-taxonomy"
+    static_configs:
+      - targets: ["host.docker.internal:8019"]
+    metrics_path: /metrics
+
   - job_name: 'postgres-exporter'
     static_configs:
       - targets: ['postgres-exporter:9187']

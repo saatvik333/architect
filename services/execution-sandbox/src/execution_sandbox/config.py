@@ -58,5 +58,55 @@ class ExecutionSandboxConfig(BaseSettings):
         ge=1_000,
         description="Maximum characters of stderr to store in audit log entries.",
     )
+    # ── Executor backend selection ──────────────────────────────────
+    executor_backend: str = Field(
+        default="docker",
+        pattern=r"^(docker|firecracker|auto)$",
+        description=(
+            "Executor backend: 'docker', 'firecracker', or 'auto'. "
+            "'auto' tries Firecracker if KVM is available, falls back to Docker."
+        ),
+    )
+
+    # ── Firecracker-specific settings ────────────────────────────────
+    firecracker_binary: str = Field(
+        default="/usr/bin/firecracker",
+        description="Path to the Firecracker binary.",
+    )
+    firecracker_kernel_image: str = Field(
+        default="/var/lib/architect/vmlinux",
+        description="Path to the kernel image for Firecracker microVMs.",
+    )
+    firecracker_rootfs_image: str = Field(
+        default="/var/lib/architect/rootfs.ext4",
+        description="Path to the base rootfs image for Firecracker microVMs.",
+    )
+    firecracker_jailer_binary: str = Field(
+        default="/usr/bin/jailer",
+        description="Path to the Firecracker jailer binary.",
+    )
+    firecracker_socket_dir: str = Field(
+        default="/tmp/architect-fc-sockets",  # nosec B108
+        description="Directory for Firecracker VM API sockets.",
+    )
+    firecracker_use_jailer: bool = Field(
+        default=False,
+        description="Whether to use the jailer for additional isolation.",
+    )
+    firecracker_ssh_key_path: str = Field(
+        default="/var/lib/architect/fc-ssh-key",
+        description="Path to the SSH private key for Firecracker VM communication.",
+    )
+    firecracker_ssh_user: str = Field(
+        default="sandbox",
+        description="SSH username inside Firecracker VMs.",
+    )
+    firecracker_ssh_port: int = Field(
+        default=22,
+        ge=1,
+        le=65535,
+        description="SSH port inside Firecracker VMs.",
+    )
+
     host: str = "0.0.0.0"  # nosec B104 # intended for container deployments
     port: int = Field(default=8007, ge=1, le=65535)

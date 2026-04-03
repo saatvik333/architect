@@ -9,25 +9,37 @@ from pydantic import Field
 from architect_common.enums import (
     AgentType,
     ApprovalGateStatus,
+    DeploymentStage,
     EnforcementLevel,
     EscalationCategory,
     EscalationSeverity,
     EvalVerdict,
     EventType,
+    FailureCode,
+    FindingSeverity,
+    ImprovementType,
     ModelTier,
+    RollbackReason,
+    ScanType,
+    ScanVerdict,
     TaskType,
 )
 from architect_common.types import (
     AgentId,
     ApprovalGateId,
     ArchitectBase,
+    DeploymentId,
     EscalationId,
     EventId,
+    FailureRecordId,
     HeuristicId,
+    ImprovementId,
     KnowledgeId,
     LedgerVersion,
     PatternId,
+    PostMortemId,
     ProposalId,
+    SecurityScanId,
     TaskId,
     new_event_id,
     utcnow,
@@ -271,3 +283,109 @@ class ApprovalResolvedEvent(ArchitectBase):
 
     gate_id: ApprovalGateId
     status: ApprovalGateStatus
+
+
+# ── Security Immune events ───────────────────────────────────────
+class SecurityScanStartedEvent(ArchitectBase):
+    """Emitted when a security scan begins."""
+
+    scan_id: SecurityScanId
+    scan_type: ScanType
+    target: str
+
+
+class SecurityScanCompletedEvent(ArchitectBase):
+    """Emitted when a security scan finishes."""
+
+    scan_id: SecurityScanId
+    scan_type: ScanType
+    verdict: ScanVerdict
+    findings_count: int
+    critical_count: int
+
+
+class SecurityFindingCreatedEvent(ArchitectBase):
+    """Emitted when a high/critical finding is discovered."""
+
+    finding_id: str
+    scan_id: SecurityScanId
+    severity: FindingSeverity
+    category: str
+    description: str
+
+
+class SecurityPolicyViolationEvent(ArchitectBase):
+    """Emitted when a security policy rule is triggered."""
+
+    policy_id: str
+    scan_id: SecurityScanId
+    action_taken: str
+    details: dict[str, object] = Field(default_factory=dict)
+
+
+class SecurityGateBlockedEvent(ArchitectBase):
+    """Emitted when code is blocked by the security gate."""
+
+    scan_id: SecurityScanId
+    blocking_findings: int
+    target: str
+
+
+# ── Deployment Pipeline events ───────────────────────────────────
+class DeploymentStartedEvent(ArchitectBase):
+    """Emitted when a deployment workflow begins."""
+
+    deployment_id: DeploymentId
+    task_id: TaskId
+    artifact_ref: str
+
+
+class DeploymentStageChangedEvent(ArchitectBase):
+    """Emitted at each traffic percentage change."""
+
+    deployment_id: DeploymentId
+    stage: DeploymentStage
+    traffic_pct: int
+
+
+class DeploymentCompletedEvent(ArchitectBase):
+    """Emitted on successful full rollout."""
+
+    deployment_id: DeploymentId
+    task_id: TaskId
+    duration_seconds: float
+
+
+class DeploymentRolledBackEvent(ArchitectBase):
+    """Emitted on rollback."""
+
+    deployment_id: DeploymentId
+    reason: RollbackReason
+    stage_at_rollback: DeploymentStage
+
+
+# ── Failure Taxonomy events ──────────────────────────────────────
+class FailureClassifiedEvent(ArchitectBase):
+    """Emitted when a failure is classified."""
+
+    failure_record_id: FailureRecordId
+    task_id: TaskId
+    failure_code: FailureCode
+    confidence: float
+
+
+class ImprovementProposedEvent(ArchitectBase):
+    """Emitted when improvements are generated from analysis."""
+
+    improvement_id: ImprovementId
+    improvement_type: ImprovementType
+    description: str
+
+
+class PostMortemCompletedEvent(ArchitectBase):
+    """Emitted when post-mortem analysis finishes."""
+
+    post_mortem_id: PostMortemId
+    project_id: str
+    failure_count: int
+    improvements_proposed: int

@@ -86,6 +86,10 @@ run-services: $(PID_DIR)
 	uv run uvicorn knowledge_memory.service:create_app --factory --host 127.0.0.1 --port 8014 & echo $$! > $(PID_DIR)/knowledge-memory.pid
 	uv run uvicorn economic_governor.service:create_app --factory --host 127.0.0.1 --port 8015 & echo $$! > $(PID_DIR)/econ-gov.pid
 	uv run uvicorn human_interface.service:create_app --factory --host 127.0.0.1 --port 8016 & echo $$! > $(PID_DIR)/human-interface.pid
+	@echo "Starting Phase 4 services..."
+	uv run uvicorn security_immune.service:create_app --factory --host 127.0.0.1 --port 8017 & echo $$! > $(PID_DIR)/security-immune.pid
+	uv run uvicorn deployment_pipeline.service:create_app --factory --host 127.0.0.1 --port 8018 & echo $$! > $(PID_DIR)/deploy-pipeline.pid
+	uv run uvicorn failure_taxonomy.service:create_app --factory --host 127.0.0.1 --port 8019 & echo $$! > $(PID_DIR)/failure-taxonomy.pid
 	@echo "All services started. PIDs in $(PID_DIR)/"
 
 run-gateway: $(PID_DIR)
@@ -108,7 +112,7 @@ run-all: infra-up migrate run-services run-gateway run-dashboard
 
 stop-all:
 	@echo "Stopping services..."
-	@-lsof -ti :8001,:8003,:8007,:8008,:8009,:8010,:8011,:8012,:8013,:8014,:8015,:8016,:8000 2>/dev/null | xargs kill 2>/dev/null || true
+	@-lsof -ti :8001,:8003,:8007,:8008,:8009,:8010,:8011,:8012,:8013,:8014,:8015,:8016,:8017,:8018,:8019,:8000 2>/dev/null | xargs kill 2>/dev/null || true
 	@-lsof -ti :3000 2>/dev/null | xargs kill 2>/dev/null || true
 	@rm -f $(PID_DIR)/*.pid 2>/dev/null || true
 	@echo "Stopping infrastructure..."

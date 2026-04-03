@@ -24,6 +24,19 @@ HeuristicId = NewType("HeuristicId", str)
 EscalationId = NewType("EscalationId", str)
 ApprovalGateId = NewType("ApprovalGateId", str)
 
+# ── Phase 4: Security Immune System ─────────────────────────────
+SecurityScanId = NewType("SecurityScanId", str)
+SecurityFindingId = NewType("SecurityFindingId", str)
+SecurityPolicyId = NewType("SecurityPolicyId", str)
+
+# ── Phase 4: Deployment Pipeline ────────────────────────────────
+DeploymentId = NewType("DeploymentId", str)
+
+# ── Phase 4: Failure Taxonomy ───────────────────────────────────
+FailureRecordId = NewType("FailureRecordId", str)
+PostMortemId = NewType("PostMortemId", str)
+ImprovementId = NewType("ImprovementId", str)
+
 
 def _prefixed_uuid(prefix: str) -> str:
     return f"{prefix}-{uuid.uuid4().hex}"
@@ -63,6 +76,35 @@ def new_escalation_id() -> EscalationId:
 
 def new_approval_gate_id() -> ApprovalGateId:
     return ApprovalGateId(_prefixed_uuid("gate"))
+
+
+# ── Phase 4 factories ───────────────────────────────────────────
+def new_security_scan_id() -> SecurityScanId:
+    return SecurityScanId(_prefixed_uuid("scan"))
+
+
+def new_security_finding_id() -> SecurityFindingId:
+    return SecurityFindingId(_prefixed_uuid("sfnd"))
+
+
+def new_security_policy_id() -> SecurityPolicyId:
+    return SecurityPolicyId(_prefixed_uuid("spol"))
+
+
+def new_deployment_id() -> DeploymentId:
+    return DeploymentId(_prefixed_uuid("deploy"))
+
+
+def new_failure_record_id() -> FailureRecordId:
+    return FailureRecordId(_prefixed_uuid("fail"))
+
+
+def new_post_mortem_id() -> PostMortemId:
+    return PostMortemId(_prefixed_uuid("pm"))
+
+
+def new_improvement_id() -> ImprovementId:
+    return ImprovementId(_prefixed_uuid("imp"))
 
 
 # ── Common field annotations ─────────────────────────────────────

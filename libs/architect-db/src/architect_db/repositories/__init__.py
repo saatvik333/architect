@@ -14,6 +14,12 @@ from architect_db.repositories.escalation_repo import (
 )
 from architect_db.repositories.evaluation_repo import EvaluationReportRepository
 from architect_db.repositories.event_repo import EventRepository
+from architect_db.repositories.failure_repo import (
+    FailureRecordRepository,
+    ImprovementRepository,
+    PostMortemRepository,
+    SimulationRunRepository,
+)
 from architect_db.repositories.knowledge_repo import (
     HeuristicRuleRepository,
     KnowledgeEntryRepository,
@@ -22,6 +28,11 @@ from architect_db.repositories.knowledge_repo import (
 )
 from architect_db.repositories.proposal_repo import ProposalRepository
 from architect_db.repositories.sandbox_repo import SandboxSessionRepository
+from architect_db.repositories.security_repo import (
+    SecurityFindingRepository,
+    SecurityPolicyRepository,
+    SecurityScanRepository,
+)
 from architect_db.repositories.spec_repo import SpecificationRepository
 from architect_db.repositories.task_repo import TaskRepository
 
@@ -36,12 +47,19 @@ __all__ = [
     "EscalationRepository",
     "EvaluationReportRepository",
     "EventRepository",
+    "FailureRecordRepository",
     "HeuristicRuleRepository",
+    "ImprovementRepository",
     "KnowledgeEntryRepository",
     "KnowledgeObservationRepository",
     "MetaStrategyRepository",
+    "PostMortemRepository",
     "ProposalRepository",
     "SandboxSessionRepository",
+    "SecurityFindingRepository",
+    "SecurityPolicyRepository",
+    "SecurityScanRepository",
+    "SimulationRunRepository",
     "SpecificationRepository",
     "TaskRepository",
 ]

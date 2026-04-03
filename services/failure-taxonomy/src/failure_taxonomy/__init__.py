@@ -1,1 +1,1 @@
-"""ARCHITECT Failure Taxonomy Engine — error classification and recovery strategies. Phase 4 implementation."""
+"""ARCHITECT Failure Taxonomy Engine — error classification, post-mortem analysis, and recovery strategies."""
