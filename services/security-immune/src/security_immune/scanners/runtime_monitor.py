@@ -23,7 +23,7 @@ _ALLOWED_NETWORKS: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = [
 
 # File path prefixes that sandbox code is allowed to access.
 _ALLOWED_FILE_PREFIXES: tuple[str, ...] = (
-    "/tmp/",
+    "/tmp/",  # nosec B108 # sandbox temp dir allowlist
     "/workspace/",
     "/home/sandbox/",
     "/usr/lib/",

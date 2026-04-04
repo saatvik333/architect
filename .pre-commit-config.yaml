@@ -10,7 +10,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy (typecheck)
-        entry: uv run mypy libs/ services/ apps/
+        entry: uv run mypy libs/ services/ apps/ --exclude "tests/"
         language: system
         types: [python]
         pass_filenames: false

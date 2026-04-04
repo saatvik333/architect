@@ -256,7 +256,7 @@ class KnowledgeStore:
 
         params["max_batch"] = max_batch
         where = " AND ".join(conditions)
-        query = f"SELECT * FROM observations WHERE {where} ORDER BY created_at LIMIT :max_batch"
+        query = f"SELECT * FROM observations WHERE {where} ORDER BY created_at LIMIT :max_batch"  # nosec B608 # where clause from hardcoded conditions
 
         async with self._session_factory() as session:
             result = await session.execute(text(query), params)
@@ -338,7 +338,7 @@ class KnowledgeStore:
             params["domain"] = domain
 
         where = " AND ".join(conditions)
-        query = f"SELECT * FROM heuristics WHERE {where} ORDER BY confidence DESC"
+        query = f"SELECT * FROM heuristics WHERE {where} ORDER BY confidence DESC"  # nosec B608 # where clause from hardcoded conditions
 
         async with self._session_factory() as session:
             result = await session.execute(text(query), params)

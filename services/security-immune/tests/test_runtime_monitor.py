@@ -19,7 +19,7 @@ class TestRuntimeMonitor:
                 {"remote_ip": "127.0.0.1", "remote_port": 5432},
             ],
             file_accesses=[
-                {"path": "/tmp/test.py", "operation": "read"},
+                {"path": "/tmp/test.py", "operation": "read"},  # nosec B108
                 {"path": "/workspace/src/main.py", "operation": "write"},
             ],
             processes_spawned=[
@@ -112,7 +112,7 @@ class TestRuntimeMonitor:
         report = RuntimeAnomalyReport(
             sandbox_id="sandbox-ok",
             file_accesses=[
-                {"path": "/tmp/output.txt", "operation": "write"},
+                {"path": "/tmp/output.txt", "operation": "write"},  # nosec B108
                 {"path": "/workspace/main.py", "operation": "read"},
                 {"path": "/home/sandbox/.config", "operation": "read"},
                 {"path": "/usr/lib/python3.12/os.py", "operation": "read"},
