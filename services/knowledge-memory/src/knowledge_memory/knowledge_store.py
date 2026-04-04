@@ -141,7 +141,7 @@ class KnowledgeStore:
 
         # When no embedding is provided, skip similarity ranking and limit at the DB level.
         if not query_embedding:
-            query = f"SELECT * FROM knowledge_entries WHERE {where} LIMIT :limit"
+            query = f"SELECT * FROM knowledge_entries WHERE {where} LIMIT :limit"  # nosec B608 # where clause built from hardcoded CASE conditions, not user input
             params["limit"] = limit
             async with self._session_factory() as session:
                 result = await session.execute(text(query), params)
@@ -154,7 +154,7 @@ class KnowledgeStore:
             WHERE {where} AND embedding_vec IS NOT NULL
             ORDER BY embedding_vec <=> :query_vec::vector
             LIMIT :limit
-        """
+        """  # nosec B608 # where clause built from hardcoded CASE conditions, not user input
         params["query_vec"] = str(query_embedding)
         params["limit"] = limit
 
