@@ -29,6 +29,7 @@ def _build_mock_executor() -> AsyncMock:
     """Build a mock DockerExecutor with default return values."""
     executor = AsyncMock()
     executor._sessions = {}
+    executor.active_session_count = MagicMock(return_value=0)
 
     session = _make_session_mock()
 

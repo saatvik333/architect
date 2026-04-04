@@ -32,5 +32,5 @@ class ServiceDependency[T]:
     async def cleanup(self) -> None:
         """Clear the stored instance, calling ``aclose()`` if available."""
         if self._instance is not None and hasattr(self._instance, "aclose"):
-            await self._instance.aclose()  # type: ignore[union-attr]
+            await self._instance.aclose()  # type: ignore[union-attr,unused-ignore]
         self._instance = None

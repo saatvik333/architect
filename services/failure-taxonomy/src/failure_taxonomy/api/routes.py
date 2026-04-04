@@ -258,7 +258,7 @@ async def get_failure(
     """Get a specific failure record by ID."""
     async with session_factory() as session:
         repo = FailureRecordRepository(session)
-        record = await repo.get(failure_id)
+        record = await repo.get_by_id(failure_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Failure record not found")
     return _record_to_response(record)
@@ -385,7 +385,7 @@ async def get_post_mortem(
     """Get a specific post-mortem analysis."""
     async with session_factory() as session:
         repo = PostMortemRepository(session)
-        pm = await repo.get(post_mortem_id)
+        pm = await repo.get_by_id(post_mortem_id)
     if pm is None:
         raise HTTPException(status_code=404, detail="Post-mortem not found")
     return _post_mortem_to_response(pm)
@@ -467,7 +467,7 @@ async def get_simulation(
     """Get a specific simulation run."""
     async with session_factory() as session:
         repo = SimulationRunRepository(session)
-        sim = await repo.get(simulation_id)
+        sim = await repo.get_by_id(simulation_id)
     if sim is None:
         raise HTTPException(status_code=404, detail="Simulation run not found")
     return _simulation_to_response(sim)

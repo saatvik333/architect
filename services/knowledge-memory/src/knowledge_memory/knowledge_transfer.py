@@ -8,7 +8,9 @@ overrides when global heuristics start failing in specific projects.
 from __future__ import annotations
 
 from architect_common.logging import get_logger
+from architect_common.types import new_heuristic_id
 from knowledge_memory.heuristic_engine import HeuristicEngine
+from knowledge_memory.knowledge_store import KnowledgeStore
 from knowledge_memory.models import HeuristicRule
 
 logger = get_logger(component="knowledge_transfer")
@@ -17,7 +19,6 @@ logger = get_logger(component="knowledge_transfer")
 async def find_cross_project_heuristics(
     heuristic_engine: HeuristicEngine,
     min_project_count: int = 2,
-    similarity_threshold: float = 0.85,
 ) -> list[list[HeuristicRule]]:
     """Find heuristics independently discovered in multiple projects.
 
@@ -25,7 +26,7 @@ async def find_cross_project_heuristics(
     Returns groups of related heuristics (each group has entries from different
     projects describing similar rules).
     """
-    all_heuristics = await heuristic_engine.get_active_heuristics()
+    all_heuristics = await heuristic_engine.match_heuristics()
 
     # Group by domain for efficiency
     by_domain: dict[str, list[HeuristicRule]] = {}
@@ -59,7 +60,7 @@ async def find_cross_project_heuristics(
 
 
 async def promote_to_global(
-    heuristic_engine: HeuristicEngine,
+    store: KnowledgeStore,
     heuristic_group: list[HeuristicRule],
     confidence_boost: float = 0.1,
 ) -> HeuristicRule | None:
@@ -74,10 +75,8 @@ async def promote_to_global(
     # Pick the highest-confidence entry as the template
     best = max(heuristic_group, key=lambda h: h.confidence)
 
-    # Create a global version with boosted confidence
-    from knowledge_memory.models import HeuristicRule as HeuristicModel
-
-    global_heuristic = HeuristicModel(
+    global_heuristic = HeuristicRule(
+        id=new_heuristic_id(),
         domain=best.domain,
         condition=best.condition,
         action=best.action,
@@ -90,18 +89,19 @@ async def promote_to_global(
         source_pattern_ids=best.source_pattern_ids,
     )
 
-    stored = await heuristic_engine.store_heuristic(global_heuristic)
+    await store.store_heuristic(global_heuristic.model_dump())
     logger.info(
         "heuristic_promoted_to_global",
-        heuristic_id=stored.id if stored else "unknown",
+        heuristic_id=str(global_heuristic.id),
         domain=best.domain,
         source_projects=len(heuristic_group),
     )
-    return stored
+    return global_heuristic
 
 
 async def run_knowledge_transfer(
     heuristic_engine: HeuristicEngine,
+    store: KnowledgeStore,
     min_project_count: int = 2,
 ) -> int:
     """Run the full cross-project knowledge transfer pipeline.
@@ -115,7 +115,7 @@ async def run_knowledge_transfer(
 
     promoted = 0
     for group in groups:
-        result = await promote_to_global(heuristic_engine, group)
+        result = await promote_to_global(store, group)
         if result:
             promoted += 1
 

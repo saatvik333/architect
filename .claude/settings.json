@@ -8,5 +8,8 @@
       "Bash(export PATH=\"$HOME/.local/bin:$PATH\")",
       "Bash(uv run:*)"
     ]
+  },
+  "enabledPlugins": {
+    "pyright-lsp@claude-plugins-official": true
   }
 }

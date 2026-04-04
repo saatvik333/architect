@@ -116,7 +116,7 @@ class SecurityHeadersMiddleware:
                     headers.append("Strict-Transport-Security", "max-age=31536000")
             await send(message)
 
-        await self.app(scope, receive, send_wrapper)
+        await self.app(scope, receive, send_wrapper)  # type: ignore[arg-type]
 
 
 class RequestSizeLimitMiddleware:

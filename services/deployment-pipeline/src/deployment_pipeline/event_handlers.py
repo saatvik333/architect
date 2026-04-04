@@ -30,7 +30,7 @@ class DeploymentEventHandler:
         When an evaluation passes, extract the artifact reference and
         confidence score to start a deployment.
         """
-        payload: dict[str, Any] = envelope.payload  # type: ignore[assignment]
+        payload: dict[str, Any] = dict(envelope.payload)
         verdict = payload.get("verdict", "")
         task_id = payload.get("task_id", "")
         confidence = float(payload.get("confidence", 0.0))

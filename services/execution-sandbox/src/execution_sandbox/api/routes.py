@@ -198,7 +198,7 @@ async def get_session(
 @router.get("/health", response_model=HealthResponse)
 async def health_check(executor: ExecutorDep) -> HealthResponse:
     """Liveness / readiness probe."""
-    active = len(executor._sessions)
+    active = executor.active_session_count()
     return HealthResponse(
         status=HealthStatus.HEALTHY,
         active_sandboxes=active,

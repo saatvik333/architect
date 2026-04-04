@@ -106,6 +106,11 @@ module = [
 ]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["architect_cli.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+
 [tool.bandit]
 exclude_dirs = ["tests", "*/tests/*"]
 skips = ["B101"]  # allow assert statements in tests

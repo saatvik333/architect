@@ -55,40 +55,24 @@ class TestRecordHeuristicFailure:
     @pytest.mark.asyncio
     async def test_downgrades_heuristics(self) -> None:
         engine = AsyncMock()
-        evolved = HeuristicRule(
-            domain="test",
-            condition="if X",
-            action="do Y",
-            active=True,
-            confidence=0.3,
-        )
-        engine.evolve_heuristic.return_value = evolved
 
-        deactivated = await record_heuristic_failure(engine, ["h-1", "h-2"])
-        assert deactivated == []
+        downgraded = await record_heuristic_failure(engine, ["h-1", "h-2"])
+        assert downgraded == ["h-1", "h-2"]
         assert engine.evolve_heuristic.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_deactivates_when_inactive(self) -> None:
+    async def test_single_heuristic(self) -> None:
         engine = AsyncMock()
-        evolved = HeuristicRule(
-            domain="test",
-            condition="if X",
-            action="do Y",
-            active=False,
-            confidence=0.1,
-        )
-        engine.evolve_heuristic.return_value = evolved
 
-        deactivated = await record_heuristic_failure(engine, ["h-1"])
-        assert deactivated == ["h-1"]
+        downgraded = await record_heuristic_failure(engine, ["h-1"])
+        assert downgraded == ["h-1"]
 
 
 class TestReviewHeuristicEffectiveness:
     @pytest.mark.asyncio
     async def test_finds_ineffective(self) -> None:
         engine = AsyncMock()
-        engine.get_active_heuristics.return_value = [
+        engine.match_heuristics.return_value = [
             HeuristicRule(
                 domain="test",
                 condition="cond",
@@ -112,7 +96,7 @@ class TestReviewHeuristicEffectiveness:
     @pytest.mark.asyncio
     async def test_ignores_small_samples(self) -> None:
         engine = AsyncMock()
-        engine.get_active_heuristics.return_value = [
+        engine.match_heuristics.return_value = [
             HeuristicRule(
                 domain="test",
                 condition="cond",

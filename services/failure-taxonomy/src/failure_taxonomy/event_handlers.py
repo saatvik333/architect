@@ -53,7 +53,8 @@ class FailureTaxonomyEventHandlers:
             return
 
         task_id = str(payload.get("task_id", ""))
-        layer_results = payload.get("layer_results", [])
+        raw_layers = payload.get("layer_results", [])
+        layer_results: list[object] = list(raw_layers) if isinstance(raw_layers, list) else []
 
         # Build classification request from the failing layers
         error_messages: list[str] = []

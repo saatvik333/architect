@@ -246,8 +246,8 @@ class EfficiencyScorer:
 
             for row in rows:
                 stats = _AgentStats(
-                    agent_type=row.agent_type or AgentType.CODER,
-                    model_tier=row.model_tier or ModelTier.TIER_2,
+                    agent_type=AgentType(row.agent_type) if row.agent_type else AgentType.CODER,
+                    model_tier=ModelTier(row.model_tier) if row.model_tier else ModelTier.TIER_2,
                 )
                 stats.tasks_completed = row.tasks_completed
                 stats.tasks_failed = row.tasks_failed

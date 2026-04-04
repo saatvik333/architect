@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 
 from architect_common.logging import get_logger
+from architect_common.types import HeuristicId
 from knowledge_memory.heuristic_engine import HeuristicEngine
 from knowledge_memory.models import HeuristicRule
 
@@ -52,19 +53,18 @@ async def record_heuristic_failure(
 ) -> list[str]:
     """Downgrade confidence for heuristics implicated in a failure.
 
-    Returns a list of heuristic IDs that were deactivated.
+    Returns the list of heuristic IDs that were downgraded.
     """
-    deactivated: list[str] = []
+    downgraded: list[str] = []
     for heuristic_id in heuristic_ids:
-        evolved = await heuristic_engine.evolve_heuristic(heuristic_id, success=False)
-        if evolved and not evolved.active:
-            deactivated.append(heuristic_id)
-            logger.info(
-                "heuristic_deactivated",
-                heuristic_id=heuristic_id,
-                reason="high_failure_rate",
-            )
-    return deactivated
+        await heuristic_engine.evolve_heuristic(HeuristicId(heuristic_id), success=False)
+        downgraded.append(heuristic_id)
+        logger.info(
+            "heuristic_downgraded",
+            heuristic_id=heuristic_id,
+            reason="failure_recorded",
+        )
+    return downgraded
 
 
 async def review_heuristic_effectiveness(
@@ -77,7 +77,7 @@ async def review_heuristic_effectiveness(
     Returns heuristics where ``failure_count / total > failure_threshold``
     and ``total >= min_samples``.
     """
-    all_heuristics = await heuristic_engine.get_active_heuristics()
+    all_heuristics = await heuristic_engine.match_heuristics()
     ineffective: list[HeuristicRule] = []
 
     for h in all_heuristics:

@@ -151,7 +151,7 @@ class TestFailuresEndpoints:
     def test_get_failure_not_found(self, client: TestClient) -> None:
         with patch("failure_taxonomy.api.routes.FailureRecordRepository") as mock_repo_cls:
             mock_repo = AsyncMock()
-            mock_repo.get = AsyncMock(return_value=None)
+            mock_repo.get_by_id = AsyncMock(return_value=None)
             mock_repo_cls.return_value = mock_repo
 
             response = client.get("/api/v1/failures/nonexistent")

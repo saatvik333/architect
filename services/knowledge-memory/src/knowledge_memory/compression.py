@@ -10,7 +10,7 @@ from typing import Any
 
 from architect_common.enums import MemoryLayer
 from architect_common.logging import get_logger
-from architect_common.types import KnowledgeId, new_knowledge_id
+from architect_common.types import KnowledgeId, PatternId, new_knowledge_id
 from architect_llm.client import LLMClient
 from architect_llm.models import LLMRequest
 from knowledge_memory.heuristic_engine import HeuristicEngine
@@ -100,7 +100,9 @@ class CompressionPipeline:
 
             # Link observations to the first stored pattern in the cluster
             obs_ids = [KnowledgeId(o["id"]) for o in cluster]
-            link_id = stored_pattern_ids[0] if stored_pattern_ids else new_knowledge_id()
+            link_id = PatternId(
+                str(stored_pattern_ids[0]) if stored_pattern_ids else str(new_knowledge_id())
+            )
             await self._store.mark_observations_compressed(obs_ids, link_id)
 
         return CompressionResult(

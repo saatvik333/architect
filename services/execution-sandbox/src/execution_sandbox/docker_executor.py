@@ -463,6 +463,10 @@ class DockerExecutor(ExecutorBase):
         """Return the session for *session_id*, or ``None``."""
         return self._sessions.get(session_id)
 
+    def active_session_count(self) -> int:
+        """Return the number of currently active sessions."""
+        return len(self._sessions)
+
     # ── Internal helpers ─────────────────────────────────────────────
 
     def _get_session(self, session_id: str) -> SandboxSession:

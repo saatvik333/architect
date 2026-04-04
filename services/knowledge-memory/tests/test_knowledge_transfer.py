@@ -22,10 +22,15 @@ def mock_engine() -> AsyncMock:
     return AsyncMock()
 
 
+@pytest.fixture
+def mock_store() -> AsyncMock:
+    return AsyncMock()
+
+
 class TestFindCrossProjectHeuristics:
     @pytest.mark.asyncio
     async def test_finds_common_heuristics(self, mock_engine: AsyncMock) -> None:
-        mock_engine.get_active_heuristics.return_value = [
+        mock_engine.match_heuristics.return_value = [
             HeuristicRule(
                 domain="auth",
                 condition="token refresh fails",
@@ -46,7 +51,7 @@ class TestFindCrossProjectHeuristics:
 
     @pytest.mark.asyncio
     async def test_ignores_single_project(self, mock_engine: AsyncMock) -> None:
-        mock_engine.get_active_heuristics.return_value = [
+        mock_engine.match_heuristics.return_value = [
             HeuristicRule(
                 domain="auth",
                 condition="token refresh fails",
@@ -60,7 +65,7 @@ class TestFindCrossProjectHeuristics:
 
     @pytest.mark.asyncio
     async def test_ignores_global_heuristics(self, mock_engine: AsyncMock) -> None:
-        mock_engine.get_active_heuristics.return_value = [
+        mock_engine.match_heuristics.return_value = [
             HeuristicRule(
                 domain="auth",
                 condition="token refresh fails",
@@ -81,14 +86,7 @@ class TestFindCrossProjectHeuristics:
 
 class TestPromoteToGlobal:
     @pytest.mark.asyncio
-    async def test_promotes_highest_confidence(self, mock_engine: AsyncMock) -> None:
-        mock_engine.store_heuristic.return_value = HeuristicRule(
-            domain="auth",
-            condition="test",
-            action="act",
-            confidence=0.9,
-        )
-
+    async def test_promotes_highest_confidence(self, mock_store: AsyncMock) -> None:
         group = [
             HeuristicRule(
                 domain="auth",
@@ -106,23 +104,22 @@ class TestPromoteToGlobal:
             ),
         ]
 
-        result = await promote_to_global(mock_engine, group)
+        result = await promote_to_global(mock_store, group)
         assert result is not None
-        # The stored heuristic should have been based on the 0.8 confidence entry
-        call_args = mock_engine.store_heuristic.call_args[0][0]
-        assert call_args.project_id == ""  # Global scope
-        assert call_args.confidence == pytest.approx(0.9)  # 0.8 + 0.1 boost
+        assert result.project_id == ""  # Global scope
+        assert result.confidence == pytest.approx(0.9)  # 0.8 + 0.1 boost
+        mock_store.store_heuristic.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_empty_group(self, mock_engine: AsyncMock) -> None:
-        result = await promote_to_global(mock_engine, [])
+    async def test_empty_group(self, mock_store: AsyncMock) -> None:
+        result = await promote_to_global(mock_store, [])
         assert result is None
 
 
 class TestRunKnowledgeTransfer:
     @pytest.mark.asyncio
-    async def test_end_to_end(self, mock_engine: AsyncMock) -> None:
-        mock_engine.get_active_heuristics.return_value = [
+    async def test_end_to_end(self, mock_engine: AsyncMock, mock_store: AsyncMock) -> None:
+        mock_engine.match_heuristics.return_value = [
             HeuristicRule(
                 domain="db",
                 condition="n+1 query detected",
@@ -138,13 +135,7 @@ class TestRunKnowledgeTransfer:
                 confidence=0.8,
             ),
         ]
-        mock_engine.store_heuristic.return_value = HeuristicRule(
-            domain="db",
-            condition="n+1 query detected",
-            action="add eager loading",
-            confidence=0.9,
-        )
 
-        promoted = await run_knowledge_transfer(mock_engine, min_project_count=2)
+        promoted = await run_knowledge_transfer(mock_engine, mock_store, min_project_count=2)
         assert promoted == 1
-        mock_engine.store_heuristic.assert_called_once()
+        mock_store.store_heuristic.assert_called_once()

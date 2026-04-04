@@ -60,10 +60,10 @@ class FailureRecordRepository(BaseRepository[FailureRecord]):
     async def get_stats_by_code(self) -> dict[str, int]:
         stmt = select(
             FailureRecord.failure_code,
-            func.count().label("count"),
+            func.count().label("cnt"),
         ).group_by(FailureRecord.failure_code)
         result = await self._session.execute(stmt)
-        return {row.failure_code: row.count for row in result.all()}
+        return {row.failure_code: row.cnt for row in result.all()}
 
     async def get_recent(self, *, limit: int = 50) -> list[FailureRecord]:
         stmt = select(FailureRecord).order_by(FailureRecord.created_at.desc()).limit(limit)

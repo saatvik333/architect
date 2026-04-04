@@ -42,3 +42,11 @@ class ExecutorBase(ABC):
     @abstractmethod
     async def destroy(self, session_id: str) -> None:
         """Tear down the sandbox and release all resources."""
+
+    @abstractmethod
+    def get_session(self, session_id: str) -> SandboxSession | None:
+        """Return the session for *session_id*, or ``None``."""
+
+    @abstractmethod
+    def active_session_count(self) -> int:
+        """Return the number of currently active sessions."""
