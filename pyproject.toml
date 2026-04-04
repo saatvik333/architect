@@ -79,6 +79,10 @@ markers = [
     "slow: marks tests that take >10s",
 ]
 asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::RuntimeWarning:.*AsyncMockMixin.*",
+    "ignore:Remove `format_exc_info`:UserWarning:structlog",
+]
 
 [tool.mypy]
 python_version = "3.12"

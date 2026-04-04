@@ -23,6 +23,7 @@ from architect_db.repositories.budget_repo import (
 def _mock_session() -> AsyncMock:
     """Create a mock AsyncSession with common methods."""
     session = AsyncMock()
+    session.add = MagicMock()  # session.add() is synchronous in SQLAlchemy
     session.flush = AsyncMock()
     session.refresh = AsyncMock()
     return session

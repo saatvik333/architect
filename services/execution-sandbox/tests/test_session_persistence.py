@@ -46,6 +46,7 @@ class TestSessionPersistence:
     async def test_persist_session_creates_new_row(self) -> None:
         """_persist_session inserts a new row when session doesn't exist in DB."""
         mock_db_session = AsyncMock()
+        mock_db_session.add = MagicMock()  # session.add() is synchronous in SQLAlchemy
         mock_repo = MagicMock()
         mock_repo.get_by_id = AsyncMock(return_value=None)
 
